@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0](https://github.com/sourceblender/musubi-harness/compare/v1.3.2...v1.4.0) - 2026-09-26
+
 ### Added
 - `validity_refusal(claims, now=None)`: what Musubi refuses outside the identity
   checks. It mirrors PyJWT's `_validate_claims` as Musubi calls it (`aud`
