@@ -5,6 +5,13 @@ All notable changes to `musubi-harness` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1](https://github.com/sourceblender/musubi-harness/compare/v1.3.0...v1.3.1) (2026-09-26)
+
+
+### Bug Fixes
+
+* report tokens Musubi refuses as an identity, not only sub and scope ([#14](https://github.com/sourceblender/musubi-harness/issues/14)) ([5b919bd](https://github.com/sourceblender/musubi-harness/commit/5b919bdfb918f9a76c51d878ed8640c8af5f452d))
+
 ## [Unreleased]
 
 ### Fixed
