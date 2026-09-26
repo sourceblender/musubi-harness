@@ -5,14 +5,9 @@ All notable changes to `musubi-harness` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.3.2](https://github.com/sourceblender/musubi-harness/compare/v1.3.1...v1.3.2) (2026-09-26)
-
-
-### Bug Fixes
-
-* resolve accepts receipt-lookup's own observation shape ([#16](https://github.com/sourceblender/musubi-harness/issues/16)) ([374ad7a](https://github.com/sourceblender/musubi-harness/commit/374ad7a47469b48378791516cd63522b7c635a14))
-
 ## [Unreleased]
+
+## [1.3.2](https://github.com/sourceblender/musubi-harness/compare/v1.3.1...v1.3.2) - 2026-09-26
 
 ### Fixed
 - `resolve` accepts the `receipt_observation` that `musubi-memory-data musubi
