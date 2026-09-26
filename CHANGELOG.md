@@ -5,14 +5,9 @@ All notable changes to `musubi-harness` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.4.0](https://github.com/sourceblender/musubi-harness/compare/v1.3.2...v1.4.0) (2026-09-26)
-
-
-### Features
-
-* token diagnostics cover what the JWT decode refuses (iss, aud, exp) ([#18](https://github.com/sourceblender/musubi-harness/issues/18)) ([fe46280](https://github.com/sourceblender/musubi-harness/commit/fe46280186240638a4de5368e4b351540f2125d2))
-
 ## [Unreleased]
+
+## [1.4.0](https://github.com/sourceblender/musubi-harness/compare/v1.3.2...v1.4.0) - 2026-09-26
 
 ### Added
 - `validity_refusal(claims, now=None)`: what Musubi refuses outside the identity
