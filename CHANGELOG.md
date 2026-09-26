@@ -5,14 +5,19 @@ All notable changes to `musubi-harness` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.1](https://github.com/sourceblender/musubi-harness/compare/v1.1.0...v1.1.1) (2026-09-26)
-
-
-### Bug Fixes
-
-* capture refuses 14 more credential formats, and stops refusing identifiers ([#7](https://github.com/sourceblender/musubi-harness/issues/7)) ([59af72d](https://github.com/sourceblender/musubi-harness/commit/59af72d084a26fe02c673045868650651b7f1010))
-
 ## [Unreleased]
+
+## [1.1.1](https://github.com/sourceblender/musubi-harness/compare/v1.1.0...v1.1.1) - 2026-09-26
+
+### Security
+- Capture also refuses these credential formats (`SECRET_RE`): OpenAI `sk-…` and
+  Anthropic `sk-ant-…` keys, GitHub `gho_`/`ghu_`/`ghs_`/`ghr_` tokens, AWS
+  `AKIA`/`ASIA` key ids, Slack `xox*-` tokens, Google `AIza…` keys, JWTs (signed
+  or not), and encrypted, PGP and other PEM private-key blocks. The Bearer rule
+  no longer refuses lowercase identifiers such as `Bearer credentials_file`,
+  which used to cost whole turns about auth config.
+  Measured: 24 of 24 credential samples caught (was 9); across 1,137 tracked
+  files in six repositories, no new false positives and 7 old ones removed.
 
 ## [1.1.0](https://github.com/sourceblender/musubi-harness/compare/v1.0.1...v1.1.0) - 2026-09-26
 
@@ -54,12 +59,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   one is refused without echoing it.
 - A malformed `MUSUBI_API_URL` is a configuration error (exit 2), never a
   traceback.
-- Capture refuses 14 more credential formats (`SECRET_RE`): OpenAI `sk-…` and
-  Anthropic `sk-ant-…` keys, GitHub `gho_`/`ghu_`/`ghs_`/`ghr_` tokens, AWS
-  `AKIA`/`ASIA` key ids, Slack `xox*-` tokens, Google `AIza…` keys, JWTs (signed
-  or not), and encrypted, PGP and other PEM private-key blocks. The Bearer rule
-  no longer refuses lowercase identifiers such as `Bearer credentials_file`,
-  which used to cost whole turns about auth config.
 
 ### Unchanged
 - Where an operator `memory-data` is configured, on `PATH`, beside
