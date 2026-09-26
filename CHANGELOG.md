@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `resolve` accepts the `receipt_observation` that `musubi-memory-data musubi
+  receipt-lookup` prints (`subject`/`effective_scopes`, plus `attestation`,
+  `issuer`, `presence`) as well as the stored `principal`/`token_scopes` shape.
+  It checks the lookup's own fields (self-attested, presence equals subject, an
+  issuer present) and always stores the v1 shape, so existing evidence and the
+  outbox triggers are unchanged.
+
 ## [1.3.1](https://github.com/sourceblender/musubi-harness/compare/v1.3.0...v1.3.1) - 2026-09-26
 
 ### Fixed
