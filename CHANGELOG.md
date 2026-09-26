@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0](https://github.com/sourceblender/musubi-harness/compare/v1.2.0...v1.3.0) - 2026-09-26
+
 ### Added
 - `musubi_harness.tokens`: local, unverified token diagnostics shared by every
   adapter. `token_claims`, `scope_allows(scope, namespace, "r"|"w")` (mirrors
@@ -19,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A complete `MUSUBI_ACTOR`/`MUSUBI_PRESENCE`/`MUSUBI_ZONE` identity in the
   environment is no longer blocked by a malformed shared `config.json`, which
   it does not use for identity. The file stays strict when identity comes from it.
+- `token_presence_problems` never prints an unverified claim as-is: only a
+  presence-shaped subject is shown, anything else reads "an unrecognised
+  subject", and a token with a missing or non-string subject is reported
+  rather than passed.
 
 ## [1.2.0](https://github.com/sourceblender/musubi-harness/compare/v1.1.1...v1.2.0) - 2026-09-26
 
