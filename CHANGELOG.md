@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `token_presence_problems` now also reports a token Musubi would refuse as an
+  identity, even when its `sub` and write scope fit the seat: a missing `sub` or
+  `presence` claim, a malformed scope claim, a non-concrete presence, `sub` !=
+  `presence`, or a scope naming another tenant. New `identity_refusal(claims)`
+  mirrors the identity half of `musubi/auth/tokens.py` and returns the server's
+  own fixed reasons, never a claim value. Parity with the server's
+  `_identity_consistency_error` is tested whenever `MUSUBI_SOURCE_DIR` is set.
+
 ## [1.3.0](https://github.com/sourceblender/musubi-harness/compare/v1.2.0...v1.3.0) - 2026-09-26
 
 ### Added
