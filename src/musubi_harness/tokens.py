@@ -84,11 +84,42 @@ def _shown(value: Any) -> str:
     return value if isinstance(value, str) and _PRESENCE.fullmatch(value) else "an unrecognised subject"
 
 
+def identity_refusal(claims: dict[str, Any]) -> str | None:
+    """Why Musubi would refuse these claims as an identity, or None.
+
+    Mirrors the identity half of ``musubi/auth/tokens.py``
+    ``_context_from_payload``: the sub and presence claims, the scope shape,
+    then ``_identity_consistency_error`` and ``_concrete_scope_tenant``. It
+    returns the server's own fixed reasons, so no claim value is echoed.
+    Signature, issuer, audience and expiry are not checked here.
+    """
+    subject, presence, scopes = claims.get("sub"), claims.get("presence"), claims.get("scope")
+    if not isinstance(subject, str) or not subject:
+        return "token missing sub claim"
+    if not isinstance(presence, str) or not presence:
+        return "token missing presence claim"
+    if not (isinstance(scopes, str) or (isinstance(scopes, list) and all(isinstance(item, str) for item in scopes))):
+        return "token scope claim must be a string list"
+    presence_parts = presence.split("/")
+    if len(presence_parts) != 2 or any(not part for part in presence_parts) or any("*" in part for part in presence_parts):
+        return "token presence claim must be a concrete tenant/presence identity"
+    if subject != presence:
+        return "token subject is inconsistent with presence identity"
+    for scope in _entries(scopes):
+        if scope == "operator" or ":" not in scope:
+            continue
+        tenant = scope.rsplit(":", 1)[0].split("/", 1)[0]
+        if tenant not in ("*", "**") and tenant and tenant != presence_parts[0]:
+            return "token presence tenant is inconsistent with namespace scope tenant"
+    return None
+
+
 def token_presence_problems(token: str, presence: str) -> list[str]:
     """Plain-language problems with using ``token`` as ``presence``; empty when it fits.
 
-    Checks the subject and write access to ``<presence>/episodic``, where
-    capture and remember write. An unreadable (opaque) token yields no problems:
+    Checks the subject, write access to ``<presence>/episodic`` (where capture
+    and remember write), and whether Musubi would accept the claims as an
+    identity at all. An unreadable (opaque) token yields no problems:
     there is nothing local to check, and the server still decides.
     """
     claims = token_claims(token)
@@ -102,4 +133,8 @@ def token_presence_problems(token: str, presence: str) -> list[str]:
         problems.append(f"the Musubi token is for {_shown(subject)}, but this seat is {seat}")
     if not scope_allows(claims.get("scope"), f"{presence}/episodic", "w"):
         problems.append(f"the token cannot write {seat}/episodic, so nothing will be delivered")
+    # Sub and scope can both fit while Musubi still refuses every request (Tama's review of #12).
+    refusal = identity_refusal(claims)
+    if refusal:
+        problems.append(f"Musubi will refuse this token ({refusal})")
     return problems

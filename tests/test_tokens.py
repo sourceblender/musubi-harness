@@ -17,7 +17,7 @@ from unittest.mock import patch
 import pytest
 
 from musubi_harness.plugin_runtime import PluginRuntime, RuntimeConfigError
-from musubi_harness.tokens import scope_allows, token_claims, token_presence_problems
+from musubi_harness.tokens import identity_refusal, scope_allows, token_claims, token_presence_problems
 
 
 def jwt(claims: dict[str, Any]) -> str:
@@ -27,12 +27,12 @@ def jwt(claims: dict[str, Any]) -> str:
     return f"{part({'alg': 'none'})}.{part(claims)}.sig"
 
 
-RIGHT = jwt({"sub": "aoi/command-chair", "scope": "aoi/command-chair/*:rw"})
-VOICE = jwt({"sub": "aoi/voice", "scope": "aoi/voice:r aoi/voice/*:rw **:r"})  # the 0.5.0 canary's token
+RIGHT = jwt({"sub": "aoi/command-chair", "presence": "aoi/command-chair", "scope": "aoi/command-chair/*:rw"})
+VOICE = jwt({"sub": "aoi/voice", "presence": "aoi/voice", "scope": "aoi/voice:r aoi/voice/*:rw **:r"})  # the 0.5.0 canary's token
 
 
 def test_claims_decode_locally_and_unreadable_tokens_are_none() -> None:
-    assert token_claims(RIGHT) == {"sub": "aoi/command-chair", "scope": "aoi/command-chair/*:rw"}
+    assert token_claims(RIGHT) == {"sub": "aoi/command-chair", "presence": "aoi/command-chair", "scope": "aoi/command-chair/*:rw"}
     assert token_claims("opaque-token") is None and token_claims("a.b.c") is None
 
 
@@ -110,7 +110,7 @@ def test_config_sourced_identity_stays_strict(tmp_path: Path) -> None:
 )
 def test_an_unverified_subject_cannot_forge_a_line(sub: Any) -> None:
     # Yua's review of #12: the claim is untrusted input; every problem stays one clean line.
-    token = jwt({"sub": sub, "scope": "aoi/voice/*:rw"})
+    token = jwt({"sub": sub, "presence": sub, "scope": "aoi/voice/*:rw"})
     problems = token_presence_problems(token, "aoi/command-chair")
     assert problems  # still reported
     for problem in problems:
@@ -122,6 +122,51 @@ def test_an_unverified_subject_cannot_forge_a_line(sub: Any) -> None:
 @pytest.mark.parametrize("claims", [{"scope": "aoi/command-chair/*:rw"}, {"sub": None, "scope": "aoi/command-chair/*:rw"}])
 def test_a_missing_subject_is_still_reported_even_with_write_scope(claims: dict[str, Any]) -> None:
     # Yua's review: a decodable token without a subject establishes no seat.
-    assert token_presence_problems(jwt(claims), "aoi/command-chair") == [
-        "the Musubi token is for an unrecognised subject, but this seat is aoi/command-chair"
+    assert token_presence_problems(jwt({**claims, "presence": "aoi/command-chair"}), "aoi/command-chair") == [
+        "the Musubi token is for an unrecognised subject, but this seat is aoi/command-chair",
+        "Musubi will refuse this token (token missing sub claim)",
+    ]
+
+
+def test_a_presence_claim_that_disagrees_with_the_subject_is_refused() -> None:
+    # Tama's repro: sub and write scope both fit this seat, so the old helper said
+    # nothing, but Musubi rejects every request because sub != presence.
+    token = jwt({"sub": "aoi/command-chair", "presence": "aoi/voice", "scope": "aoi/command-chair/episodic:rw"})
+    assert token_presence_problems(token, "aoi/command-chair") == [
+        "Musubi will refuse this token (token subject is inconsistent with presence identity)"
+    ]
+
+
+SEAT = "aoi/command-chair"
+
+
+@pytest.mark.parametrize(
+    ("claims", "reason"),
+    [
+        ({"sub": SEAT, "presence": SEAT, "scope": "aoi/command-chair/*:rw"}, None),
+        ({"sub": SEAT, "presence": SEAT, "scope": ["aoi/command-chair/*:rw", "**:r", "*/x/y:r", "operator"]}, None),
+        ({"sub": SEAT, "scope": "aoi/command-chair/*:rw"}, "token missing presence claim"),
+        ({"sub": SEAT, "presence": "", "scope": "aoi/command-chair/*:rw"}, "token missing presence claim"),
+        ({"sub": SEAT, "presence": SEAT, "scope": ["aoi/command-chair/*:rw", 7]}, "token scope claim must be a string list"),
+        ({"sub": SEAT, "presence": SEAT}, "token scope claim must be a string list"),
+        ({"sub": "aoi/*", "presence": "aoi/*", "scope": "aoi/*/*:rw"}, "token presence claim must be a concrete tenant/presence identity"),
+        ({"sub": "aoi", "presence": "aoi", "scope": "aoi/*:rw"}, "token presence claim must be a concrete tenant/presence identity"),
+        (
+            {"sub": "aoi/a/b", "presence": "aoi/a/b", "scope": "aoi/*:rw"},
+            "token presence claim must be a concrete tenant/presence identity",
+        ),
+        (
+            {"sub": SEAT, "presence": SEAT, "scope": "aoi/command-chair/*:rw yua/voice/*:r"},
+            "token presence tenant is inconsistent with namespace scope tenant",
+        ),
+    ],
+)
+def test_identity_refusal_follows_the_server(claims: dict[str, Any], reason: str | None) -> None:
+    assert identity_refusal(claims) == reason
+
+
+def test_a_foreign_tenant_scope_is_refused_even_when_this_seat_can_write() -> None:
+    token = jwt({"sub": SEAT, "presence": SEAT, "scope": "aoi/command-chair/*:rw yua/voice/*:r"})
+    assert token_presence_problems(token, SEAT) == [
+        "Musubi will refuse this token (token presence tenant is inconsistent with namespace scope tenant)"
     ]
