@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `musubi_harness.tokens`: local, unverified token diagnostics shared by every
+  adapter. `token_claims`, `scope_allows(scope, namespace, "r"|"w")` (mirrors
+  Musubi's `auth/scopes.py` exactly; a bare `**` never grants write), and
+  `token_presence_problems(token, presence)`, which names a token that belongs
+  to another seat or cannot write `<presence>/episodic`. Diagnostics only: the
+  server decides.
+
+### Fixed
+- A complete `MUSUBI_ACTOR`/`MUSUBI_PRESENCE`/`MUSUBI_ZONE` identity in the
+  environment is no longer blocked by a malformed shared `config.json`, which
+  it does not use for identity. The file stays strict when identity comes from it.
+
 ## [1.2.0](https://github.com/sourceblender/musubi-harness/compare/v1.1.1...v1.2.0) - 2026-09-26
 
 ### Added

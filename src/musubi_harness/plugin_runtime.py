@@ -102,7 +102,17 @@ class PluginRuntime:
     def runtime_config(self) -> RuntimeConfig:
         names = ("MUSUBI_ACTOR", "MUSUBI_PRESENCE", "MUSUBI_ZONE")
         values = tuple(os.environ.get(name, "") for name in names)
-        raw = self.plugin_config()
+        if all(values):
+            # A seat whose launcher supplies its whole identity must not be blocked
+            # by a shared config.json it does not use for identity (several seats
+            # can share one OS user). A broken shared file counts as absent here;
+            # it stays strict when identity comes from it. (Tama's review.)
+            try:
+                raw = self.plugin_config()
+            except RuntimeConfigError:
+                raw = {}
+        else:
+            raw = self.plugin_config()
         if all(values):
             actor, presence, zone = values
         elif any(values):
