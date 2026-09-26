@@ -5,6 +5,13 @@ All notable changes to `musubi-harness` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1](https://github.com/sourceblender/musubi-harness/compare/v1.1.0...v1.1.1) (2026-09-26)
+
+
+### Bug Fixes
+
+* capture refuses 14 more credential formats, and stops refusing identifiers ([#7](https://github.com/sourceblender/musubi-harness/issues/7)) ([59af72d](https://github.com/sourceblender/musubi-harness/commit/59af72d084a26fe02c673045868650651b7f1010))
+
 ## [Unreleased]
 
 ## [1.1.0](https://github.com/sourceblender/musubi-harness/compare/v1.0.1...v1.1.0) - 2026-09-26
