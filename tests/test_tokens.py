@@ -10,6 +10,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import time
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -17,14 +18,16 @@ from unittest.mock import patch
 import pytest
 
 from musubi_harness.plugin_runtime import PluginRuntime, RuntimeConfigError
-from musubi_harness.tokens import identity_refusal, scope_allows, token_claims, token_presence_problems
+from musubi_harness.tokens import identity_refusal, scope_allows, token_claims, token_presence_problems, validity_refusal
+
+REAL = {"iss": "https://oauth.example", "aud": "musubi"}  # every real Musubi token carries both
 
 
-def jwt(claims: dict[str, Any]) -> str:
+def jwt(claims: dict[str, Any], *, bare: bool = False) -> str:
     def part(obj: dict[str, Any]) -> str:
         return base64.urlsafe_b64encode(json.dumps(obj).encode()).decode().rstrip("=")
 
-    return f"{part({'alg': 'none'})}.{part(claims)}.sig"
+    return f"{part({'alg': 'none'})}.{part(claims if bare else {**REAL, **claims})}.sig"
 
 
 RIGHT = jwt({"sub": "aoi/command-chair", "presence": "aoi/command-chair", "scope": "aoi/command-chair/*:rw"})
@@ -32,7 +35,7 @@ VOICE = jwt({"sub": "aoi/voice", "presence": "aoi/voice", "scope": "aoi/voice:r 
 
 
 def test_claims_decode_locally_and_unreadable_tokens_are_none() -> None:
-    assert token_claims(RIGHT) == {"sub": "aoi/command-chair", "presence": "aoi/command-chair", "scope": "aoi/command-chair/*:rw"}
+    assert token_claims(RIGHT) == {**REAL, "sub": "aoi/command-chair", "presence": "aoi/command-chair", "scope": "aoi/command-chair/*:rw"}
     assert token_claims("opaque-token") is None and token_claims("a.b.c") is None
 
 
@@ -170,3 +173,53 @@ def test_a_foreign_tenant_scope_is_refused_even_when_this_seat_can_write() -> No
     assert token_presence_problems(token, SEAT) == [
         "Musubi will refuse this token (token presence tenant is inconsistent with namespace scope tenant)"
     ]
+
+
+NOW = 1_800_000_000.0
+FITS = {**REAL, "sub": SEAT, "presence": SEAT, "scope": "aoi/command-chair/*:rw"}
+
+
+@pytest.mark.parametrize(
+    ("claims", "reason"),
+    [
+        (FITS, None),
+        ({**FITS, "exp": int(NOW) + 60}, None),
+        ({**FITS, "aud": ["other", "musubi"]}, None),
+        ({**FITS, "exp": int(NOW)}, "token has expired"),  # no leeway, as PyJWT
+        ({**FITS, "exp": int(NOW) - 86400}, "token has expired"),
+        ({**FITS, "exp": "soon"}, "token exp claim must be an integer"),
+        ({**FITS, "exp": True}, "token has expired"),  # PyJWT reads int(True) == 1
+        ({**FITS, "exp": NOW + 60.9}, None),  # a float is truncated, not refused
+        ({**FITS, "exp": str(int(NOW) + 60)}, None),  # so is a numeric string
+        ({**FITS, "exp": None}, "token exp claim must be an integer"),
+        ({k: v for k, v in FITS.items() if k != "aud"}, "token missing aud claim"),
+        ({**FITS, "aud": "other"}, "token audience is not musubi"),
+        ({**FITS, "aud": []}, "token missing aud claim"),  # PyJWT: empty is missing
+        ({**FITS, "aud": ""}, "token missing aud claim"),
+        ({**FITS, "aud": ["musubi", 7]}, "token audience is not musubi"),
+        ({k: v for k, v in FITS.items() if k != "iss"}, "token missing iss claim"),
+        ({**FITS, "iss": ""}, "token missing iss claim"),
+    ],
+)
+def test_validity_refusal_follows_the_servers_jwt_decode(claims: dict[str, Any], reason: str | None) -> None:
+    assert validity_refusal(claims, now=NOW) == reason
+
+
+def test_an_expired_token_is_named_even_when_everything_else_fits() -> None:
+    token = jwt({**FITS, "exp": int(time.time()) - 60})
+    assert token_presence_problems(token, SEAT) == ["Musubi will refuse this token (token has expired)"]
+
+
+def test_a_token_expiring_soon_is_named_with_its_day() -> None:
+    exp = int(time.time()) + 3 * 86400
+    day = time.strftime("%Y-%m-%d", time.gmtime(exp))
+    assert token_presence_problems(jwt({**FITS, "exp": exp}), SEAT) == [f"the Musubi token expires on {day} (UTC); renew it before then"]
+
+
+def test_a_token_with_months_left_changes_nothing() -> None:
+    assert token_presence_problems(jwt({**FITS, "exp": int(time.time()) + 200 * 86400}), SEAT) == []
+
+
+def test_a_bare_token_without_iss_or_aud_is_refused() -> None:
+    token = jwt({"sub": SEAT, "presence": SEAT, "scope": "aoi/command-chair/*:rw"}, bare=True)
+    assert token_presence_problems(token, SEAT) == ["Musubi will refuse this token (token missing aud claim)"]

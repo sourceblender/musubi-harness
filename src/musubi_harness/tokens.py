@@ -28,6 +28,8 @@ from __future__ import annotations
 import base64
 import json
 import re
+import time
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 Access = Literal["r", "w"]
@@ -91,7 +93,7 @@ def identity_refusal(claims: dict[str, Any]) -> str | None:
     ``_context_from_payload``: the sub and presence claims, the scope shape,
     then ``_identity_consistency_error`` and ``_concrete_scope_tenant``. It
     returns the server's own fixed reasons, so no claim value is echoed.
-    Signature, issuer, audience and expiry are not checked here.
+    Signature, issuer, audience and expiry are ``validity_refusal``'s.
     """
     subject, presence, scopes = claims.get("sub"), claims.get("presence"), claims.get("scope")
     if not isinstance(subject, str) or not subject:
@@ -114,12 +116,55 @@ def identity_refusal(claims: dict[str, Any]) -> str | None:
     return None
 
 
+AUDIENCE = "musubi"  # musubi/auth/tokens.py _AUDIENCE
+EXPIRY_WARNING_DAYS = 14
+
+
+def _expiry(claims: dict[str, Any]) -> int | None:
+    """``exp`` as PyJWT reads it (``int(payload["exp"])``), or None when absent or unreadable."""
+    if "exp" not in claims:
+        return None
+    try:
+        return int(claims["exp"])
+    except (ValueError, TypeError, OverflowError):
+        return None
+
+
+def validity_refusal(claims: dict[str, Any], now: float | None = None) -> str | None:
+    """Why Musubi's JWT decode would refuse these claims before identity, or None.
+
+    Mirrors what ``jwt.decode(..., audience="musubi", issuer=...)`` in
+    ``musubi/auth/tokens.py`` enforces on the claims: ``aud`` present and
+    naming ``musubi``, ``iss`` present, and an ``exp`` that, when present, is
+    readable as PyJWT's ``int(exp)`` and in the future (no leeway). The issuer's expected value is
+    deployment configuration, so only its presence is checked here. Reasons are
+    fixed strings; no claim value is echoed.
+    """
+    current = time.time() if now is None else now
+    if "exp" in claims:
+        exp = _expiry(claims)
+        if exp is None:
+            return "token exp claim must be an integer"
+        if exp <= current:  # PyJWT: exp <= now - leeway, and Musubi passes no leeway
+            return "token has expired"
+    aud = claims.get("aud")
+    if not aud:  # PyJWT: an absent or empty aud is a missing claim
+        return "token missing aud claim"
+    audiences = [aud] if isinstance(aud, str) else aud
+    if not isinstance(audiences, list) or not all(isinstance(item, str) for item in audiences) or AUDIENCE not in audiences:
+        return "token audience is not musubi"
+    if not isinstance(claims.get("iss"), str) or not claims["iss"]:
+        return "token missing iss claim"
+    return None
+
+
 def token_presence_problems(token: str, presence: str) -> list[str]:
     """Plain-language problems with using ``token`` as ``presence``; empty when it fits.
 
     Checks the subject, write access to ``<presence>/episodic`` (where capture
-    and remember write), and whether Musubi would accept the claims as an
-    identity at all. An unreadable (opaque) token yields no problems:
+    and remember write), whether Musubi would accept the claims at all
+    (``validity_refusal``, ``identity_refusal``), and a token expiring within
+    ``EXPIRY_WARNING_DAYS``. An unreadable (opaque) token yields no problems:
     there is nothing local to check, and the server still decides.
     """
     claims = token_claims(token)
@@ -134,7 +179,13 @@ def token_presence_problems(token: str, presence: str) -> list[str]:
     if not scope_allows(claims.get("scope"), f"{presence}/episodic", "w"):
         problems.append(f"the token cannot write {seat}/episodic, so nothing will be delivered")
     # Sub and scope can both fit while Musubi still refuses every request (Tama's review of #12).
-    refusal = identity_refusal(claims)
-    if refusal:
-        problems.append(f"Musubi will refuse this token ({refusal})")
+    for refusal in (validity_refusal(claims), identity_refusal(claims)):
+        if refusal:
+            problems.append(f"Musubi will refuse this token ({refusal})")
+    # Every seat's token was minted together, so they expire together, and silently
+    # at the drain. Say so while there is still time to renew.
+    exp = _expiry(claims)
+    if exp is not None and time.time() < exp <= time.time() + EXPIRY_WARNING_DAYS * 86400:
+        day = datetime.fromtimestamp(exp, tz=UTC).strftime("%Y-%m-%d")
+        problems.append(f"the Musubi token expires on {day} (UTC); renew it before then")
     return problems

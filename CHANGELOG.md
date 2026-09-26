@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `validity_refusal(claims, now=None)`: what Musubi's JWT decode refuses
+  before identity. `aud` must be present and name `musubi`, `iss` must be
+  present, and `exp`, when present, is read as PyJWT reads it (`int(exp)`) and
+  must be in the future (no leeway). Fixed reasons only. Differential-tested
+  against PyJWT's own `_validate_exp`/`_validate_aud`, which now runs in CI.
+- `token_presence_problems` reports those refusals, and names a token expiring
+  within 14 days with its UTC date. Every seat's token was minted together, so
+  they expire together and silently at the drain.
+
 ## [1.3.2](https://github.com/sourceblender/musubi-harness/compare/v1.3.1...v1.3.2) - 2026-09-26
 
 ### Fixed
