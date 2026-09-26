@@ -1,57 +1,129 @@
-"""validity_refusal agrees with the PyJWT that Musubi's server runs, claim for claim.
+"""The local verdict agrees with Musubi's whole claim path, not one stage of it.
 
-Musubi decodes with ``jwt.decode(..., audience="musubi", issuer=...)`` and no
-leeway. This compares against PyJWT's own ``_validate_exp`` and
-``_validate_aud`` when PyJWT is importable (it is in a Musubi checkout's venv):
+Musubi runs PyJWT's ``_validate_claims`` (``jwt.decode(..., audience="musubi",
+issuer=<configured>)``, no leeway) and then its own ``_context_from_payload``.
+Checking only the PyJWT stage missed that the second stage refuses an ``aud``
+list PyJWT accepts (Tama's review of #18). This runs both real stages: PyJWT
+from the environment, ``_context_from_payload`` from a Musubi checkout.
 
-    ~/Projects/musubi/.venv/bin/python -m pytest tests/test_token_validity_parity.py
+    MUSUBI_SOURCE_DIR=~/Projects/musubi pytest tests/test_token_validity_parity.py
+
+CI clones Musubi and installs PyJWT, so this runs on every PR.
 """
 
 from __future__ import annotations
 
+import itertools
+import os
+import re
+import time
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import pytest
 
-from musubi_harness.tokens import validity_refusal
+from musubi_harness.tokens import identity_refusal, validity_refusal
 
 jwt = pytest.importorskip("jwt")
-NOW = 1_800_000_000.0
-BASE = {"iss": "https://oauth.example"}
+SOURCE = Path(os.environ.get("MUSUBI_SOURCE_DIR", "")).expanduser() / "src" / "musubi" / "auth" / "tokens.py"
+pytestmark = pytest.mark.skipif(not SOURCE.is_file(), reason="set MUSUBI_SOURCE_DIR to a Musubi checkout to run claim parity")
+ISSUER = "https://oauth.example"  # the deployment's configured issuer; locally only presence is knowable
 
 
-def server(payload: dict[str, Any], check: str) -> str | None:
-    api = jwt.api_jwt.PyJWT()
+@dataclass
+class _Ok:
+    value: Any
+
+
+@dataclass
+class _Err:
+    error: Any
+
+
+class _InvalidTokenError(Exception):
+    def __init__(self, detail: str = "") -> None:
+        self.detail = detail
+
+
+def server_context() -> Any:
+    text = SOURCE.read_text(encoding="utf-8")
+    namespace: dict[str, Any] = {
+        "Ok": _Ok,
+        "Err": _Err,
+        "InvalidTokenError": _InvalidTokenError,
+        "AuthContext": lambda **kwargs: kwargs,
+        "Any": Any,
+        "Result": Any,
+        "cast": lambda _t, v: v,
+    }
+    for name in ("_parse_scopes", "_identity_consistency_error", "_concrete_scope_tenant", "_context_from_payload"):
+        match = re.search(rf"^def {name}\(.*?(?=^def |^class |\Z)", text, re.S | re.M)
+        assert match, f"{name} not found in {SOURCE}"
+        exec(match.group(0), namespace)
+    return namespace["_context_from_payload"]
+
+
+def server_refuses(claims: dict[str, Any], context: Any) -> bool:
     try:
-        if check == "exp":
-            api._validate_exp(payload, NOW, 0)
-        else:
-            api._validate_aud(payload, "musubi")
-    except jwt.ExpiredSignatureError:
-        return "token has expired"
-    except jwt.DecodeError:
-        return "token exp claim must be an integer"
-    except jwt.MissingRequiredClaimError:
-        return "token missing aud claim"
-    except jwt.InvalidAudienceError:
-        return "token audience is not musubi"
-    except TypeError:
-        # PyJWT crashes on a non-numeric-typed exp; the server cannot accept it either.
-        return "token exp claim must be an integer"
-    return None
+        jwt.api_jwt.PyJWT()._validate_claims(
+            dict(claims), jwt.api_jwt.PyJWT()._merge_options(None), audience="musubi", issuer=ISSUER, leeway=0
+        )
+    except (jwt.PyJWTError, TypeError):
+        return True
+    return isinstance(context(dict(claims)), _Err)
 
 
-EXPS = [True, False, 0, 1, NOW, NOW - 1, NOW + 1, NOW + 0.5, NOW - 0.5, str(int(NOW) + 5), str(int(NOW) - 5)]
-EXPS += ["soon", "1.5", 1e300, None, [], {}]
-AUDS = ["musubi", "other", ["musubi"], ["other", "musubi"], ["other"], [], ["musubi", 7], [7], 7, "", "musubix"]
-AUDS += [["Musubi"], ("musubi",), {"musubi": 1}]
+def local_refuses(claims: dict[str, Any]) -> bool:
+    return validity_refusal(claims) is not None or identity_refusal(claims) is not None
 
 
-@pytest.mark.parametrize("exp", EXPS, ids=repr)
-def test_exp_matches_pyjwt(exp: Any) -> None:
-    assert validity_refusal({**BASE, "aud": "musubi", "exp": exp}, now=NOW) == server({"exp": exp}, "exp")
+SEAT = "aoi/command-chair"
+NOW = int(time.time())
+VARIANTS: dict[str, list[Any]] = {
+    "aud": ["musubi", ["musubi"], ["other", "musubi"], "other", "", [], None, 7],
+    "exp": [NOW + 3600, NOW - 3600, str(NOW + 3600), "soon", None, "absent"],
+    "iat": [NOW - 3600, NOW + 3600, "then", "absent"],
+    "nbf": [NOW - 3600, NOW + 3600, "absent"],
+    "jti": ["id-1", 7, "absent"],
+    "sub": [SEAT, "aoi/voice", 7, "", "absent"],
+    "presence": [SEAT, "aoi/voice", "aoi/*", "absent"],
+}
+BASE = {"iss": ISSUER, "aud": "musubi", "sub": SEAT, "presence": SEAT, "scope": "aoi/command-chair/*:rw"}
 
 
-@pytest.mark.parametrize("aud", AUDS, ids=repr)
-def test_aud_matches_pyjwt(aud: Any) -> None:
-    assert validity_refusal({**BASE, "aud": aud}, now=NOW) == server({"aud": aud}, "aud")
+def cases() -> list[dict[str, Any]]:
+    out = []
+    for key, values in VARIANTS.items():  # every single-claim variation
+        for value in values:
+            claims = {k: v for k, v in BASE.items() if k != key}
+            if value != "absent":
+                claims[key] = value
+            out.append(claims)
+    for aud, exp, sub in itertools.product(VARIANTS["aud"], VARIANTS["exp"], VARIANTS["sub"]):  # and combinations
+        claims = {k: v for k, v in BASE.items() if k not in ("aud", "exp", "sub")}
+        for key, value in (("aud", aud), ("exp", exp), ("sub", sub)):
+            if value != "absent":
+                claims[key] = value
+        out.append(claims)
+    for iss in (ISSUER, "", ["x"], "absent"):
+        claims = {k: v for k, v in BASE.items() if k != "iss"}
+        if iss != "absent":
+            claims["iss"] = iss
+        out.append(claims)
+    return out
+
+
+def test_local_refusal_matches_the_servers_whole_claim_path() -> None:
+    context = server_context()
+    mismatches = [
+        (claims, server_refuses(claims, context), local_refuses(claims))
+        for claims in cases()
+        if server_refuses(claims, context) != local_refuses(claims)
+    ]
+    assert mismatches == []
+
+
+def test_tamas_list_audience_is_refused_by_both() -> None:
+    claims = {**BASE, "aud": ["musubi"]}
+    assert server_refuses(claims, server_context()) and local_refuses(claims)
