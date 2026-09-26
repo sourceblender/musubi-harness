@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `validity_refusal(claims, now=None)`: what Musubi refuses outside the identity
+  checks. It mirrors PyJWT's `_validate_claims` as Musubi calls it (`aud`
+  `musubi`, an `iss`, no leeway on `exp`/`iat`/`nbf`, string `sub`/`jti`), then
+  `_context_from_payload`, which also requires `iss` and `aud` to be non-empty
+  strings (so an `aud` list PyJWT accepts is still refused). Fixed reasons only.
+  A differential test runs both real stages over 277 claim sets. CI now clones
+  Musubi and installs PyJWT, so every source-parity test runs on each PR.
+- `token_presence_problems` reports the first refusal (as Musubi does), and names a token expiring
+  within 14 days with its UTC date. Every seat's token was minted together, so
+  they expire together and silently at the drain.
+
 ## [1.3.2](https://github.com/sourceblender/musubi-harness/compare/v1.3.1...v1.3.2) - 2026-09-26
 
 ### Fixed
