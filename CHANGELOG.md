@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.2](https://github.com/sourceblender/musubi-harness/compare/v1.3.1...v1.3.2) - 2026-09-26
+
 ### Fixed
 - `resolve` accepts the `receipt_observation` that `musubi-memory-data musubi
   receipt-lookup` prints (`subject`/`effective_scopes`, plus `attestation`,
