@@ -59,13 +59,10 @@ jobs:
       # extracted and exec'd; the package is never installed or imported.
       # Tracks Musubi main, so server drift fails here.
       - name: Musubi source for parity tests
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          repository: ericmey/musubi
-          path: musubi-src
-          persist-credentials: false
+        # Outside the workspace: the secret-pattern test scans this repo's text.
+        run: git clone --depth 1 --quiet https://github.com/ericmey/musubi "$RUNNER_TEMP/musubi-src"
 
       - name: pytest
         env:
-          MUSUBI_SOURCE_DIR: ${{ github.workspace }}/musubi-src
+          MUSUBI_SOURCE_DIR: ${{ runner.temp }}/musubi-src
         run: pytest --cov=musubi_harness --cov-report=term-missing
