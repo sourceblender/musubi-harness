@@ -52,33 +52,41 @@ def tool_definitions() -> list[dict[str, Any]]:
         {
             "name": "musubi_recent",
             "description": "Return bounded recent chronology. This is recency, not semantic relevance.",
-            "inputSchema": _schema({
-                "namespace": namespace,
-                "limit": {"type": "integer", "minimum": 1, "maximum": 20, "default": 5},
-                "tags": {"type": "array", "items": {"type": "string"}, "maxItems": 10},
-            }),
+            "inputSchema": _schema(
+                {
+                    "namespace": namespace,
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 20, "default": 5},
+                    "tags": {"type": "array", "items": {"type": "string"}, "maxItems": 10},
+                }
+            ),
             "annotations": read_annotations,
         },
         {
             "name": "musubi_search",
             "description": "Semantically search owned Musubi memory and preserve retrieval metadata.",
-            "inputSchema": _schema({
-                "namespace": namespace,
-                "query": {"type": "string", "minLength": 1, "maxLength": 2000},
-                "limit": {"type": "integer", "minimum": 1, "maximum": 10, "default": 5},
-                "mode": {"type": "string", "enum": ["fast", "deep", "blended"], "default": "deep"},
-                "planes": {"type": "array", "items": {"type": "string", "enum": sorted(PLANES)}, "maxItems": 4},
-            }, ["query"]),
+            "inputSchema": _schema(
+                {
+                    "namespace": namespace,
+                    "query": {"type": "string", "minLength": 1, "maxLength": 2000},
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 10, "default": 5},
+                    "mode": {"type": "string", "enum": ["fast", "deep", "blended"], "default": "deep"},
+                    "planes": {"type": "array", "items": {"type": "string", "enum": sorted(PLANES)}, "maxItems": 4},
+                },
+                ["query"],
+            ),
             "annotations": read_annotations,
         },
         {
             "name": "musubi_get",
             "description": "Fetch one exact Musubi object by canonical plane, namespace, and object id.",
-            "inputSchema": _schema({
-                "plane": {"type": "string", "enum": sorted(PLANES)},
-                "namespace": namespace,
-                "object_id": {"type": "string", "minLength": 1, "maxLength": 512},
-            }, ["plane", "namespace", "object_id"]),
+            "inputSchema": _schema(
+                {
+                    "plane": {"type": "string", "enum": sorted(PLANES)},
+                    "namespace": namespace,
+                    "object_id": {"type": "string", "minLength": 1, "maxLength": 512},
+                },
+                ["plane", "namespace", "object_id"],
+            ),
             "annotations": read_annotations,
         },
         {
@@ -87,17 +95,20 @@ def tool_definitions() -> list[dict[str, Any]]:
                 "Queue one load-bearing fact, decision, commitment, or relationship memory "
                 "through the durable verified-delivery outbox. Queued does not mean stored."
             ),
-            "inputSchema": _schema({
-                "content": {"type": "string", "minLength": 1, "maxLength": 131072},
-                "importance": {"type": "integer", "minimum": 1, "maximum": 10, "default": 7},
-                "topics": {"type": "array", "items": {"type": "string"}, "maxItems": 10},
-                "idempotency_key": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 128,
-                    "description": "Optional stable caller key for safe tool-call retry.",
+            "inputSchema": _schema(
+                {
+                    "content": {"type": "string", "minLength": 1, "maxLength": 131072},
+                    "importance": {"type": "integer", "minimum": 1, "maximum": 10, "default": 7},
+                    "topics": {"type": "array", "items": {"type": "string"}, "maxItems": 10},
+                    "idempotency_key": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "description": "Optional stable caller key for safe tool-call retry.",
+                    },
                 },
-            }, ["content"]),
+                ["content"],
+            ),
             "annotations": {
                 "readOnlyHint": False,
                 "destructiveHint": False,
@@ -178,7 +189,11 @@ class PluginMcpFacade:
             if not set(arguments).issubset({"namespace", "limit", "tags"}):
                 raise RuntimeConfigError("unexpected_arguments")
             command = base + [
-                "recent", "--namespace", namespace, "--exact", "--limit",
+                "recent",
+                "--namespace",
+                namespace,
+                "--exact",
+                "--limit",
                 str(_bounded_int(arguments.get("limit"), default=5, low=1, high=20)),
             ]
             tags = _string_list(arguments.get("tags"))
@@ -193,9 +208,16 @@ class PluginMcpFacade:
             if mode not in {"fast", "deep", "blended"}:
                 raise RuntimeConfigError("mode_invalid")
             command = base + [
-                "search", "--namespace", namespace, "--exact", "--query", query.strip(),
-                "--limit", str(_bounded_int(arguments.get("limit"), default=5, low=1, high=10)),
-                "--mode", mode,
+                "search",
+                "--namespace",
+                namespace,
+                "--exact",
+                "--query",
+                query.strip(),
+                "--limit",
+                str(_bounded_int(arguments.get("limit"), default=5, low=1, high=10)),
+                "--mode",
+                mode,
             ]
             planes = _string_list(arguments.get("planes"), allowed=PLANES)
             return command + (["--planes", ",".join(planes)] if planes else [])
@@ -204,55 +226,54 @@ class PluginMcpFacade:
                 raise RuntimeConfigError("arguments_invalid")
             plane = arguments["plane"]
             object_id = arguments["object_id"]
-            if (
-                plane not in PLANES
-                or not isinstance(object_id, str)
-                or not object_id.strip()
-                or len(object_id) > 512
-            ):
+            if plane not in PLANES or not isinstance(object_id, str) or not object_id.strip() or len(object_id) > 512:
                 raise RuntimeConfigError("arguments_invalid")
             api_plane: str = "concepts" if plane == "concept" else "artifacts" if plane == "artifact" else plane
             return base + [
-                "get", "--plane", api_plane, "--namespace", namespace,
-                "--object-id", object_id.strip(),
+                "get",
+                "--plane",
+                api_plane,
+                "--namespace",
+                namespace,
+                "--object-id",
+                object_id.strip(),
             ]
         raise RuntimeConfigError("unknown_tool")
 
-    def remember_command(
-        self, config: RuntimeConfig, arguments: dict[str, Any]
-    ) -> tuple[list[str], str, str]:
-        if not isinstance(arguments, dict) or not set(arguments).issubset(
-            {"content", "importance", "topics", "idempotency_key"}
-        ):
+    def remember_command(self, config: RuntimeConfig, arguments: dict[str, Any]) -> tuple[list[str], str, str]:
+        if not isinstance(arguments, dict) or not set(arguments).issubset({"content", "importance", "topics", "idempotency_key"}):
             raise RuntimeConfigError("arguments_invalid")
         content = arguments.get("content")
-        if (
-            not isinstance(content, str)
-            or not content.strip()
-            or len(content.encode("utf-8")) > 131072
-        ):
+        if not isinstance(content, str) or not content.strip() or len(content.encode("utf-8")) > 131072:
             raise RuntimeConfigError("content_invalid")
         importance = _bounded_int(arguments.get("importance"), default=7, low=1, high=10)
         topics = _string_list(arguments.get("topics"))
         supplied_key = arguments.get("idempotency_key")
         if supplied_key is not None and (
-            not isinstance(supplied_key, str)
-            or not supplied_key.strip()
-            or len(supplied_key.encode("utf-8")) > 128
+            not isinstance(supplied_key, str) or not supplied_key.strip() or len(supplied_key.encode("utf-8")) > 128
         ):
             raise RuntimeConfigError("idempotency_key_invalid")
         key = supplied_key.strip() if supplied_key is not None else uuid.uuid4().hex
-        digest = hashlib.sha256(
-            f"v1\0{config.actor}\0{config.zone}\0{key}".encode()
-        ).hexdigest()
+        digest = hashlib.sha256(f"v1\0{config.actor}\0{config.zone}\0{key}".encode()).hexdigest()
         event_id = f"{self.event_prefix}:remember:{digest}"
         db = self.runtime.data_root() / config.actor / config.zone / "shadow.db"
         command = [
-            self.runtime.harness_bin(config), "--db", str(db), "remember",
-            "--event-id", event_id, "--actor", config.actor,
-            "--presence", config.presence, "--zone", config.zone,
-            "--source", self.source,
-            "--importance", str(importance),
+            self.runtime.harness_bin(config),
+            "--db",
+            str(db),
+            "remember",
+            "--event-id",
+            event_id,
+            "--actor",
+            config.actor,
+            "--presence",
+            config.presence,
+            "--zone",
+            config.zone,
+            "--source",
+            self.source,
+            "--importance",
+            str(importance),
         ]
         for topic in topics:
             command += ["--topic", topic]
@@ -265,9 +286,7 @@ class PluginMcpFacade:
             "isError": True,
         }
 
-    def call_tool(
-        self, config: RuntimeConfig, name: str, arguments: dict[str, Any]
-    ) -> dict[str, Any]:
+    def call_tool(self, config: RuntimeConfig, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         try:
             if name == "musubi_remember":
                 return self._remember(config, arguments)
@@ -285,9 +304,13 @@ class PluginMcpFacade:
             try:
                 payload = json.loads(completed.stdout)
             except json.JSONDecodeError:
-                return self._error({
-                    "ok": False, "status": "unavailable", "detail": "memory_data_non_json",
-                })
+                return self._error(
+                    {
+                        "ok": False,
+                        "status": "unavailable",
+                        "detail": "memory_data_non_json",
+                    }
+                )
             return {
                 "content": [{"type": "text", "text": json.dumps(payload, sort_keys=True)}],
                 "structuredContent": {"result": payload},
@@ -316,9 +339,13 @@ class PluginMcpFacade:
         except (json.JSONDecodeError, AttributeError):
             staged = None
         if not isinstance(staged, dict) or staged.get("event_id") != event_id:
-            return self._error({
-                "ok": False, "status": "unavailable", "detail": "local_remember_shape_invalid",
-            })
+            return self._error(
+                {
+                    "ok": False,
+                    "status": "unavailable",
+                    "detail": "local_remember_shape_invalid",
+                }
+            )
         staged_state = staged.get("state")
         status = "verified" if staged_state == "verified" else "queued"
         object_id = staged.get("object_id") if status == "verified" else None
@@ -330,9 +357,17 @@ class PluginMcpFacade:
             db = self.runtime.data_root() / config.actor / config.zone / "shadow.db"
             drained = subprocess.run(
                 [
-                    self.runtime.harness_bin(config), "--db", str(db), "drain", "--once",
-                    "--owner", f"{config.actor}-{config.zone}-{self.owner_label}",
-                    "--memory-data-bin", self.runtime.memory_data_bin(config), "--timeout", "5",
+                    self.runtime.harness_bin(config),
+                    "--db",
+                    str(db),
+                    "drain",
+                    "--once",
+                    "--owner",
+                    f"{config.actor}-{config.zone}-{self.owner_label}",
+                    "--memory-data-bin",
+                    self.runtime.memory_data_bin(config),
+                    "--timeout",
+                    "5",
                 ],
                 text=True,
                 capture_output=True,
@@ -368,9 +403,7 @@ class PluginMcpFacade:
             "isError": status == "dead",
         }
 
-    def response_for(
-        self, request: dict[str, Any], config: RuntimeConfig
-    ) -> dict[str, Any] | None:
+    def response_for(self, request: dict[str, Any], config: RuntimeConfig) -> dict[str, Any] | None:
         request_id = request.get("id")
         method = request.get("method")
         if request_id is None:
@@ -378,31 +411,55 @@ class PluginMcpFacade:
         if method == "initialize":
             params_obj = request.get("params")
             params: dict[str, Any] = params_obj if isinstance(params_obj, dict) else {}
-            return {"jsonrpc": "2.0", "id": request_id, "result": {
-                "protocolVersion": params.get("protocolVersion", "2025-06-18"),
-                "capabilities": {"tools": {"listChanged": False}},
-                "serverInfo": {"name": self.server_name, "version": self.server_version},
-                "instructions": SERVER_INSTRUCTIONS,
-            }}
+            return {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "result": {
+                    "protocolVersion": params.get("protocolVersion", "2025-06-18"),
+                    "capabilities": {"tools": {"listChanged": False}},
+                    "serverInfo": {"name": self.server_name, "version": self.server_version},
+                    "instructions": SERVER_INSTRUCTIONS,
+                },
+            }
         if method == "ping":
             return {"jsonrpc": "2.0", "id": request_id, "result": {}}
         if method == "tools/list":
-            return {"jsonrpc": "2.0", "id": request_id, "result": {
-                "tools": tool_definitions(),
-            }}
+            return {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "result": {
+                    "tools": tool_definitions(),
+                },
+            }
         if method == "tools/call":
             call_params_obj = request.get("params")
             call_params: dict[str, Any] = call_params_obj if isinstance(call_params_obj, dict) else {}
             if not isinstance(call_params.get("name"), str):
-                return {"jsonrpc": "2.0", "id": request_id, "error": {
-                    "code": -32602, "message": "Invalid params",
-                }}
-            return {"jsonrpc": "2.0", "id": request_id, "result": self.call_tool(
-                config, call_params["name"], call_params.get("arguments", {}),
-            )}
-        return {"jsonrpc": "2.0", "id": request_id, "error": {
-            "code": -32601, "message": "Method not found",
-        }}
+                return {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "error": {
+                        "code": -32602,
+                        "message": "Invalid params",
+                    },
+                }
+            return {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "result": self.call_tool(
+                    config,
+                    call_params["name"],
+                    call_params.get("arguments", {}),
+                ),
+            }
+        return {
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "error": {
+                "code": -32601,
+                "message": "Method not found",
+            },
+        }
 
     def serve(
         self,
@@ -423,9 +480,14 @@ class PluginMcpFacade:
                     raise ValueError
                 response = self.response_for(request, config)
             except (json.JSONDecodeError, ValueError):
-                response = {"jsonrpc": "2.0", "id": None, "error": {
-                    "code": -32700, "message": "Parse error",
-                }}
+                response = {
+                    "jsonrpc": "2.0",
+                    "id": None,
+                    "error": {
+                        "code": -32700,
+                        "message": "Parse error",
+                    },
+                }
             if response is not None:
                 print(json.dumps(response, separators=(",", ":")), file=stdout, flush=True)
         return 0

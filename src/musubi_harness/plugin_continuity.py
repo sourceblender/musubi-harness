@@ -113,8 +113,17 @@ class PluginContinuity:
                 heading.append(sweep)
             completed = subprocess.run(
                 [
-                    self.runtime.memory_data_bin(config), "--json", "--timeout", "3", "musubi",
-                    "recent", "--namespace", config.presence_root, "--exact", "--limit", str(MAX_ROWS),
+                    self.runtime.memory_data_bin(config),
+                    "--json",
+                    "--timeout",
+                    "3",
+                    "musubi",
+                    "recent",
+                    "--namespace",
+                    config.presence_root,
+                    "--exact",
+                    "--limit",
+                    str(MAX_ROWS),
                 ],
                 text=True,
                 capture_output=True,
@@ -123,22 +132,14 @@ class PluginContinuity:
                 env=self.runtime.tool_environment(config),
             )
             if completed.returncode != 0:
-                detail = " ".join(
-                    (completed.stderr or completed.stdout or "provider unavailable").split()
-                )[:220]
-                return "\n".join(heading + [
-                    f"Musubi recent: unavailable ({detail}). Do not interpret this as an empty memory set."
-                ])
+                detail = " ".join((completed.stderr or completed.stdout or "provider unavailable").split())[:220]
+                return "\n".join(heading + [f"Musubi recent: unavailable ({detail}). Do not interpret this as an empty memory set."])
             rows = self._rows(json.loads(completed.stdout))
             if not rows:
-                return "\n".join(heading + [
-                    "Musubi recent: no matches in the configured presence scope."
-                ])
+                return "\n".join(heading + ["Musubi recent: no matches in the configured presence scope."])
             return "\n".join(heading + ["Recent items:"] + [self._compact(row) for row in rows])
         except (RuntimeConfigError, OSError, json.JSONDecodeError, subprocess.SubprocessError) as exc:
-            return "\n".join(heading + [
-                f"Musubi recent: unavailable ({str(exc)[:180]}). Do not interpret this as an empty memory set."
-            ])
+            return "\n".join(heading + [f"Musubi recent: unavailable ({str(exc)[:180]}). Do not interpret this as an empty memory set."])
 
 
 __all__ = ["MAX_CONTENT", "MAX_ROWS", "PluginContinuity"]

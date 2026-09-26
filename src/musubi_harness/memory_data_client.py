@@ -102,9 +102,7 @@ class MemoryDataClient:
             observation = None
             if status == "absent":
                 try:
-                    observation = LiveReceiptObservation.from_mapping(
-                        payload.get("receipt_observation")
-                    )
+                    observation = LiveReceiptObservation.from_mapping(payload.get("receipt_observation"))
                 except Exception as exc:
                     raise DeliveryTerminalError("receipt_lookup_shape_invalid") from exc
                 if (

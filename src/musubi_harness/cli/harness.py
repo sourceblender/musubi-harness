@@ -49,9 +49,7 @@ def parser() -> argparse.ArgumentParser:
     remember.add_argument("--importance", type=int, default=7)
     remember.add_argument("--topic", action="append", default=[])
     sub.add_parser("delivery-status", help="show local verified-delivery state")
-    resolve = sub.add_parser(
-        "resolve", help="terminalize one legacy ambiguity with versioned operator evidence"
-    )
+    resolve = sub.add_parser("resolve", help="terminalize one legacy ambiguity with versioned operator evidence")
     resolve.add_argument("--event-id", required=True)
     resolve.add_argument("--evidence-file", type=Path, required=True)
     drain = sub.add_parser("drain", help="run one bounded verified-delivery attempt")
@@ -78,19 +76,21 @@ def main() -> int:
             result = DeliveryStore(args.db).stage(args.event_id)
         elif args.command == "remember":
             content = sys.stdin.read()
-            envelope = TurnEnvelope.from_mapping({
-                "event_id": args.event_id,
-                "actor": args.actor,
-                "presence": args.presence,
-                "plane": "episodic",
-                "context": "primary",
-                "source": args.source,
-                "zone": args.zone,
-                "user_text": "Explicit memory selected by the agent.",
-                "assistant_text": content,
-                "captured_at": datetime.now(UTC).isoformat(),
-                "metadata": {"explicit_remember": True},
-            })
+            envelope = TurnEnvelope.from_mapping(
+                {
+                    "event_id": args.event_id,
+                    "actor": args.actor,
+                    "presence": args.presence,
+                    "plane": "episodic",
+                    "context": "primary",
+                    "source": args.source,
+                    "zone": args.zone,
+                    "user_text": "Explicit memory selected by the agent.",
+                    "assistant_text": content,
+                    "captured_at": datetime.now(UTC).isoformat(),
+                    "metadata": {"explicit_remember": True},
+                }
+            )
             outbox.enqueue(envelope, CapturePolicy())
             result = DeliveryStore(args.db).stage(
                 args.event_id,

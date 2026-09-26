@@ -107,17 +107,11 @@ class PluginRuntime:
             except KeyError as exc:
                 raise RuntimeConfigError("explicit_identity_config_missing") from exc
         presence_parts = presence.split("/")
-        if (
-            len(presence_parts) != 2
-            or presence_parts[0] != actor
-            or not all(SEGMENT.fullmatch(part) for part in (actor, *presence_parts))
-        ):
+        if len(presence_parts) != 2 or presence_parts[0] != actor or not all(SEGMENT.fullmatch(part) for part in (actor, *presence_parts)):
             raise RuntimeConfigError("identity_config_invalid")
         if zone not in {"home", "work"}:
             raise RuntimeConfigError("identity_config_invalid")
-        delivery_mode = os.environ.get("MUSUBI_DELIVERY_MODE") or raw.get(
-            "delivery_mode", "shadow"
-        )
+        delivery_mode = os.environ.get("MUSUBI_DELIVERY_MODE") or raw.get("delivery_mode", "shadow")
         if delivery_mode not in {"shadow", "verified"}:
             raise RuntimeConfigError("delivery_mode_invalid")
         return RuntimeConfig(
@@ -171,18 +165,12 @@ class PluginRuntime:
         return env
 
     @staticmethod
-    def require_owned_namespace(
-        config: RuntimeConfig, namespace: str, *, plane: str | None = None
-    ) -> str:
+    def require_owned_namespace(config: RuntimeConfig, namespace: str, *, plane: str | None = None) -> str:
         if not isinstance(namespace, str) or not namespace.strip():
             raise RuntimeConfigError("namespace_required")
         normalized = namespace.strip().rstrip("/")
         parts = normalized.split("/")
-        if (
-            len(parts) not in {2, 3}
-            or parts[0] != config.actor
-            or not all(SEGMENT.fullmatch(part) for part in parts)
-        ):
+        if len(parts) not in {2, 3} or parts[0] != config.actor or not all(SEGMENT.fullmatch(part) for part in parts):
             raise RuntimeConfigError("namespace_outside_actor_boundary")
         if len(parts) == 3 and parts[2] not in {
             "episodic",

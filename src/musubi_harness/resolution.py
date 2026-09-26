@@ -14,9 +14,7 @@ LIVE_REJECTION_SCHEMA_VERSION = 2
 EPISODIC_CREATE_CONTENT_LIMIT_BYTES = 32_768
 RESOLUTION_KINDS = frozenset({"proven_non_mutating_rejection", "operator_abandon"})
 _DIGEST_RE = re.compile(r"[0-9a-f]{64}")
-_CONTENT_TOO_LARGE_DETAIL_RE = re.compile(
-    r"episodic content is ([1-9][0-9]*) UTF-8 bytes; the limit is ([1-9][0-9]*)"
-)
+_CONTENT_TOO_LARGE_DETAIL_RE = re.compile(r"episodic content is ([1-9][0-9]*) UTF-8 bytes; the limit is ([1-9][0-9]*)")
 
 
 def _as_mapping(value: object, name: str) -> Mapping[str, object]:
@@ -136,9 +134,7 @@ class BoundaryEvidence:
             {"rejected_content_bytes", "limit_content_bytes", "exact_limit_tested"},
             "boundary_evidence",
         )
-        rejected = _positive_integer(
-            value["rejected_content_bytes"], "boundary_evidence.rejected_content_bytes"
-        )
+        rejected = _positive_integer(value["rejected_content_bytes"], "boundary_evidence.rejected_content_bytes")
         limit = _positive_integer(value["limit_content_bytes"], "boundary_evidence.limit_content_bytes")
         tested = value["exact_limit_tested"]
         if not isinstance(tested, bool):
@@ -190,20 +186,14 @@ class ProvenNonMutatingRejection:
             },
             "proven_non_mutating_rejection",
         )
-        if (
-            isinstance(value["schema_version"], bool)
-            or value["schema_version"] != RESOLUTION_SCHEMA_VERSION
-        ):
+        if isinstance(value["schema_version"], bool) or value["schema_version"] != RESOLUTION_SCHEMA_VERSION:
             raise ContractError("resolution schema_version is unsupported")
         if value["resolution_kind"] != "proven_non_mutating_rejection":
             raise ContractError("resolution_kind is invalid")
         content_bytes = _positive_integer(value["content_bytes"], "content_bytes")
         limit_bytes = _positive_integer(value["limit_bytes"], "limit_bytes")
         boundary = BoundaryEvidence.from_mapping(value["boundary_evidence"])
-        if (
-            boundary.rejected_content_bytes != content_bytes
-            or boundary.limit_content_bytes != limit_bytes
-        ):
+        if boundary.rejected_content_bytes != content_bytes or boundary.limit_content_bytes != limit_bytes:
             raise ContractError("boundary evidence does not match content and limit bytes")
         if content_bytes <= limit_bytes:
             raise ContractError("proven rejection content must exceed its limit")
@@ -216,9 +206,7 @@ class ProvenNonMutatingRejection:
             expected_request_digest=_digest(value["expected_request_digest"], "expected_request_digest"),
             content_bytes=content_bytes,
             limit_bytes=limit_bytes,
-            source_ordering_evidence=_text(
-                value["source_ordering_evidence"], "source_ordering_evidence", maximum=4096
-            ),
+            source_ordering_evidence=_text(value["source_ordering_evidence"], "source_ordering_evidence", maximum=4096),
             version_coverage=_string_list(value["version_coverage"], "version_coverage"),
             boundary_evidence=boundary,
             receipt_observation=ReceiptObservation.from_mapping(value["receipt_observation"]),
@@ -283,17 +271,11 @@ class LiveReceiptObservation:
             issuer=_text(value["issuer"], "receipt_observation.issuer", maximum=512),
             subject=_text(value["subject"], "receipt_observation.subject", maximum=256),
             presence=_text(value["presence"], "receipt_observation.presence", maximum=256),
-            effective_scopes=_string_list(
-                value["effective_scopes"], "receipt_observation.effective_scopes"
-            ),
+            effective_scopes=_string_list(value["effective_scopes"], "receipt_observation.effective_scopes"),
             observed_at=_timestamp(value["observed_at"], "receipt_observation.observed_at"),
             namespace=_text(value["namespace"], "receipt_observation.namespace", maximum=512),
-            operation_id=_text(
-                value["operation_id"], "receipt_observation.operation_id", maximum=256
-            ),
-            request_digest=_digest(
-                value["request_digest"], "receipt_observation.request_digest"
-            ),
+            operation_id=_text(value["operation_id"], "receipt_observation.operation_id", maximum=256),
+            request_digest=_digest(value["request_digest"], "receipt_observation.request_digest"),
         )
 
     def as_mapping(self) -> dict[str, object]:
@@ -350,10 +332,7 @@ class LiveTypedNonMutatingRejection:
             },
             "live_typed_non_mutating_rejection",
         )
-        if (
-            isinstance(value["schema_version"], bool)
-            or value["schema_version"] != LIVE_REJECTION_SCHEMA_VERSION
-        ):
+        if isinstance(value["schema_version"], bool) or value["schema_version"] != LIVE_REJECTION_SCHEMA_VERSION:
             raise ContractError("resolution schema_version is unsupported")
         if value["resolution_kind"] != "proven_non_mutating_rejection":
             raise ContractError("resolution_kind is invalid")
@@ -382,9 +361,7 @@ class LiveTypedNonMutatingRejection:
             event_id=_text(value["event_id"], "event_id", maximum=512),
             namespace=_text(value["namespace"], "namespace", maximum=512),
             operation_id=_text(value["operation_id"], "operation_id", maximum=256),
-            expected_request_digest=_digest(
-                value["expected_request_digest"], "expected_request_digest"
-            ),
+            expected_request_digest=_digest(value["expected_request_digest"], "expected_request_digest"),
             content_bytes_client=client_bytes,
             content_bytes_server=server_bytes,
             limit_bytes=limit_bytes,
@@ -392,9 +369,7 @@ class LiveTypedNonMutatingRejection:
             error_code="CONTENT_TOO_LARGE",
             response_detail=detail,
             observed_at=_timestamp(value["observed_at"], "observed_at"),
-            receipt_observation=LiveReceiptObservation.from_mapping(
-                value["receipt_observation"]
-            ),
+            receipt_observation=LiveReceiptObservation.from_mapping(value["receipt_observation"]),
         )
 
     def as_mapping(self) -> dict[str, object]:
@@ -445,10 +420,7 @@ class OperatorAbandon:
             },
             "operator_abandon",
         )
-        if (
-            isinstance(value["schema_version"], bool)
-            or value["schema_version"] != RESOLUTION_SCHEMA_VERSION
-        ):
+        if isinstance(value["schema_version"], bool) or value["schema_version"] != RESOLUTION_SCHEMA_VERSION:
             raise ContractError("resolution schema_version is unsupported")
         if value["resolution_kind"] != "operator_abandon":
             raise ContractError("resolution_kind is invalid")

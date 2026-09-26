@@ -18,9 +18,7 @@ CONTEXTS = frozenset({"primary", "subagent", "automation", "unknown"})
 ZONES = frozenset({"home", "work"})
 PLANES = frozenset({"episodic", "semantic", "procedural", "affective"})
 IDENTITY_RE = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
-PRESENCE_RE = re.compile(
-    r"^[a-z][a-z0-9_-]{0,31}/[a-z0-9][a-z0-9_-]{0,31}$"
-)
+PRESENCE_RE = re.compile(r"^[a-z][a-z0-9_-]{0,31}/[a-z0-9][a-z0-9_-]{0,31}$")
 EVENT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,191}$")
 SECRET_RE = re.compile(
     r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|"
@@ -28,9 +26,7 @@ SECRET_RE = re.compile(
     r"\bBearer\s+[A-Za-z0-9._~+/=-]{16,}",
     re.IGNORECASE,
 )
-FORBIDDEN_METADATA = frozenset(
-    {"system_prompt", "developer_prompt", "reasoning", "tool_output", "token", "secret"}
-)
+FORBIDDEN_METADATA = frozenset({"system_prompt", "developer_prompt", "reasoning", "tool_output", "token", "secret"})
 
 
 class ContractError(ValueError):
@@ -180,9 +176,7 @@ class Outbox:
                 )
                 """
             )
-            connection.execute(
-                "CREATE INDEX IF NOT EXISTS capture_events_scope ON capture_events(actor, zone, disposition)"
-            )
+            connection.execute("CREATE INDEX IF NOT EXISTS capture_events_scope ON capture_events(actor, zone, disposition)")
 
     @staticmethod
     def _key(envelope: TurnEnvelope) -> str:
@@ -193,11 +187,7 @@ class Outbox:
         decision = policy.evaluate(envelope)
         envelope_dict = envelope.as_dict()
         if decision.disposition == "refuse":
-            envelope_dict = {
-                key: value
-                for key, value in envelope_dict.items()
-                if key not in {"user_text", "assistant_text", "metadata"}
-            }
+            envelope_dict = {key: value for key, value in envelope_dict.items() if key not in {"user_text", "assistant_text", "metadata"}}
             envelope_dict["content_redacted"] = True
         payload = json.dumps(
             envelope_dict,
@@ -246,9 +236,7 @@ class Outbox:
                         stored_envelope.pop("captured_at", None)
                         retry_envelope.pop("captured_at", None)
                         equivalent_retry = stored_envelope == retry_envelope
-                if existing is None or (
-                    existing["envelope_sha256"] != payload_sha256 and not equivalent_retry
-                ):
+                if existing is None or (existing["envelope_sha256"] != payload_sha256 and not equivalent_retry):
                     raise ContractError("event_id collision has divergent content")
         return {
             "event_id": envelope.event_id,
@@ -259,9 +247,7 @@ class Outbox:
 
     def status(self) -> dict[str, Any]:
         with self._connection() as connection:
-            rows = connection.execute(
-                "SELECT disposition, COUNT(*) AS count FROM capture_events GROUP BY disposition"
-            ).fetchall()
+            rows = connection.execute("SELECT disposition, COUNT(*) AS count FROM capture_events GROUP BY disposition").fetchall()
             journal_mode = connection.execute("PRAGMA journal_mode").fetchone()[0]
             synchronous = connection.execute("PRAGMA synchronous").fetchone()[0]
         counts = {row["disposition"]: row["count"] for row in rows}

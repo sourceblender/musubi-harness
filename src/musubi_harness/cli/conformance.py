@@ -42,12 +42,17 @@ def main() -> int:
     except (ContractError, json.JSONDecodeError, OSError) as exc:
         print(json.dumps({"ok": False, "error": str(exc)[:500]}))
         return 2
-    print(json.dumps({
-        "ok": True,
-        "source": args.source,
-        "records": len(records),
-        "dispositions": dispositions,
-    }, sort_keys=True))
+    print(
+        json.dumps(
+            {
+                "ok": True,
+                "source": args.source,
+                "records": len(records),
+                "dispositions": dispositions,
+            },
+            sort_keys=True,
+        )
+    )
     return 0
 
 

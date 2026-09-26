@@ -27,10 +27,13 @@ def test_all_names_importable() -> None:
     assert not missing, f"missing public names: {missing}"
 
 
-@pytest.mark.parametrize("module_path,callable_name", [
-    ("musubi_harness.cli.harness", "main"),
-    ("musubi_harness.cli.conformance", "main"),
-])
+@pytest.mark.parametrize(
+    "module_path,callable_name",
+    [
+        ("musubi_harness.cli.harness", "main"),
+        ("musubi_harness.cli.conformance", "main"),
+    ],
+)
 def test_cli_entry_points(module_path: str, callable_name: str) -> None:
     """Each console script's entry-point function exists and is callable."""
     module = importlib.import_module(module_path)

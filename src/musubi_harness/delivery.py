@@ -31,14 +31,10 @@ _DIGEST_DOMAIN = b"musubi-idem-json-v1"
 
 def canonical_request_digest(body: bytes, content_type: str) -> str:
     """Match Musubi's byte-exact, content-type-bound idempotency digest."""
-    return hashlib.sha256(
-        _DIGEST_DOMAIN + b"\x00" + content_type.encode("latin-1") + b"\x00" + body
-    ).hexdigest()
+    return hashlib.sha256(_DIGEST_DOMAIN + b"\x00" + content_type.encode("latin-1") + b"\x00" + body).hexdigest()
 
 
-def _capture_body(
-    *, namespace: str, content: str, tags: tuple[str, ...], importance: int
-) -> bytes:
+def _capture_body(*, namespace: str, content: str, tags: tuple[str, ...], importance: int) -> bytes:
     return json.dumps(
         {
             "namespace": namespace,
@@ -188,9 +184,7 @@ class DeliveryStore:
         if not self.path.is_file():
             raise ContractError("delivery requires an initialized capture outbox")
         with self._connection() as connection:
-            if connection.execute(
-                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='capture_events'"
-            ).fetchone() is None:
+            if connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='capture_events'").fetchone() is None:
                 raise ContractError("delivery requires capture_events")
             connection.execute(
                 """
@@ -222,9 +216,7 @@ class DeliveryStore:
                 )
                 """
             )
-            columns = {
-                row["name"] for row in connection.execute("PRAGMA table_info(delivery_events)").fetchall()
-            }
+            columns = {row["name"] for row in connection.execute("PRAGMA table_info(delivery_events)").fetchall()}
             additions = {
                 "operation_id": "TEXT",
                 "request_content_type": "TEXT",
@@ -234,8 +226,7 @@ class DeliveryStore:
                 # Deliberately frozen to ADR 0040's two values. A third kind
                 # requires a new migration and an explicit architecture decision.
                 "resolution_kind": (
-                    "TEXT CHECK (resolution_kind IS NULL OR resolution_kind IN "
-                    "('proven_non_mutating_rejection', 'operator_abandon'))"
+                    "TEXT CHECK (resolution_kind IS NULL OR resolution_kind IN ('proven_non_mutating_rejection', 'operator_abandon'))"
                 ),
                 "resolution_evidence_json": "TEXT",
                 "resolved_at": "REAL CHECK (resolved_at IS NULL OR resolved_at >= 0)",
@@ -371,9 +362,7 @@ class DeliveryStore:
                 END
                 """
             )
-            connection.execute(
-                "CREATE INDEX IF NOT EXISTS delivery_ready ON delivery_events(state, next_attempt_at, lease_expires_at)"
-            )
+            connection.execute("CREATE INDEX IF NOT EXISTS delivery_ready ON delivery_events(state, next_attempt_at, lease_expires_at)")
 
     @staticmethod
     def _content_sha(content: str) -> str:
@@ -404,16 +393,9 @@ class DeliveryStore:
                 content = f"User: {envelope.user_text}\n\nAssistant: {envelope.assistant_text}"
             if tags is None:
                 tags = (f"src:{envelope.source}-auto",)
-            if (
-                not isinstance(content, str)
-                or not content.strip()
-                or len(content.encode("utf-8")) > 131072
-            ):
+            if not isinstance(content, str) or not content.strip() or len(content.encode("utf-8")) > 131072:
                 raise ContractError("delivery content is invalid")
-            if len(tags) > 16 or not all(
-                isinstance(tag, str) and tag.strip() and len(tag.encode("utf-8")) <= 128
-                for tag in tags
-            ):
+            if len(tags) > 16 or not all(isinstance(tag, str) and tag.strip() and len(tag.encode("utf-8")) <= 128 for tag in tags):
                 raise ContractError("delivery tags are invalid")
             normalized_tags = tuple(dict.fromkeys(tag.strip() for tag in tags))
             namespace = f"{envelope.presence}/episodic"
@@ -484,9 +466,7 @@ class DeliveryStore:
 
     def status(self) -> dict[str, object]:
         with self._connection() as connection:
-            rows = connection.execute(
-                "SELECT state, COUNT(*) AS count FROM delivery_events GROUP BY state"
-            ).fetchall()
+            rows = connection.execute("SELECT state, COUNT(*) AS count FROM delivery_events GROUP BY state").fetchall()
         return {"path": str(self.path), "counts": {row["state"]: row["count"] for row in rows}}
 
     def acquire(self, owner: str, *, now: float | None = None, lease_seconds: float = 30) -> DeliveryJob | None:
@@ -549,9 +529,7 @@ class DeliveryStore:
             )
             if updated.rowcount != 1:
                 raise ContractError("delivery lease race")
-            leased = connection.execute(
-                "SELECT * FROM delivery_events WHERE event_id = ?", (row["event_id"],)
-            ).fetchone()
+            leased = connection.execute("SELECT * FROM delivery_events WHERE event_id = ?", (row["event_id"],)).fetchone()
         return DeliveryJob(
             event_id=leased["event_id"],
             idempotency_key=leased["idempotency_key"],
@@ -636,9 +614,7 @@ class DeliveryStore:
 
     def inspect(self, event_id: str) -> dict[str, object]:
         with self._connection() as connection:
-            row = connection.execute(
-                "SELECT * FROM delivery_events WHERE event_id = ?", (event_id,)
-            ).fetchone()
+            row = connection.execute("SELECT * FROM delivery_events WHERE event_id = ?", (event_id,)).fetchone()
         if row is None:
             raise ContractError("delivery event not found")
         result = dict(row)
@@ -646,10 +622,7 @@ class DeliveryStore:
         try:
             result["tags"] = json.loads(tags_json)
         except (json.JSONDecodeError, TypeError):
-            if (
-                result["state"] != "dead"
-                or result["last_error"] != "legacy_request_reconstruction_failed"
-            ):
+            if result["state"] != "dead" or result["last_error"] != "legacy_request_reconstruction_failed":
                 raise ContractError("delivery tags are corrupt") from None
             result["tags"] = []
             result["tags_corrupt"] = True
@@ -659,9 +632,7 @@ class DeliveryStore:
 
     @staticmethod
     def _canonical_resolution_evidence(evidence: ResolutionEvidence) -> str:
-        return json.dumps(
-            evidence.as_mapping(), ensure_ascii=False, sort_keys=True, separators=(",", ":")
-        )
+        return json.dumps(evidence.as_mapping(), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
     def resolve_pending(
         self,
@@ -684,15 +655,11 @@ class DeliveryStore:
 
         with self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            row = connection.execute(
-                "SELECT * FROM delivery_events WHERE event_id = ?", (event_id,)
-            ).fetchone()
+            row = connection.execute("SELECT * FROM delivery_events WHERE event_id = ?", (event_id,)).fetchone()
             if row is None:
                 raise ContractError("delivery event not found")
 
-            prior_resolution = (
-                row["resolution_kind"], row["resolution_evidence_json"], row["resolved_at"]
-            )
+            prior_resolution = (row["resolution_kind"], row["resolution_evidence_json"], row["resolved_at"])
             if any(value is not None for value in prior_resolution):
                 if (
                     row["resolution_kind"] == evidence.resolution_kind
@@ -742,9 +709,7 @@ class DeliveryStore:
                 decoded_tags = json.loads(row["tags_json"])
             except (json.JSONDecodeError, TypeError, UnicodeDecodeError) as exc:
                 raise ContractError("delivery tags are corrupt") from exc
-            if not isinstance(decoded_tags, list) or not all(
-                isinstance(tag, str) for tag in decoded_tags
-            ):
+            if not isinstance(decoded_tags, list) or not all(isinstance(tag, str) for tag in decoded_tags):
                 raise ContractError("delivery tags are corrupt")
             tags = tuple(decoded_tags)
             projected_body = _capture_body(
@@ -820,9 +785,7 @@ class DeliveryStore:
 
         with self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            row = connection.execute(
-                "SELECT * FROM delivery_events WHERE event_id = ?", (job.event_id,)
-            ).fetchone()
+            row = connection.execute("SELECT * FROM delivery_events WHERE event_id = ?", (job.event_id,)).fetchone()
             if row is None:
                 raise ContractError("delivery event not found")
             if row["state"] != "leased" or row["lease_owner"] != owner:
@@ -831,15 +794,10 @@ class DeliveryStore:
                 raise ContractError("live rejection requires an attempted pending lease")
             if row["object_id"] is not None:
                 raise ContractError("live rejection refuses a delivery event with object_id")
-            if any(
-                row[field] is not None
-                for field in ("resolution_kind", "resolution_evidence_json", "resolved_at")
-            ):
+            if any(row[field] is not None for field in ("resolution_kind", "resolution_evidence_json", "resolved_at")):
                 raise ContractError("live rejection refuses prior resolution evidence")
             request_body = bytes(row["request_body"])
-            recomputed_digest = canonical_request_digest(
-                request_body, row["request_content_type"]
-            )
+            recomputed_digest = canonical_request_digest(request_body, row["request_content_type"])
             if row["request_digest"] != recomputed_digest:
                 raise ContractError("stored request digest does not match body and content type")
             if evidence.expected_request_digest != recomputed_digest:
@@ -859,12 +817,15 @@ class DeliveryStore:
                 tags = tuple(json.loads(row["tags_json"]))
             except (json.JSONDecodeError, TypeError, UnicodeDecodeError) as exc:
                 raise ContractError("delivery tags are corrupt") from exc
-            if _capture_body(
-                namespace=row["namespace"],
-                content=row["content"],
-                tags=tags,
-                importance=row["importance"],
-            ) != request_body:
+            if (
+                _capture_body(
+                    namespace=row["namespace"],
+                    content=row["content"],
+                    tags=tags,
+                    importance=row["importance"],
+                )
+                != request_body
+            ):
                 raise ContractError("stored request body does not match the delivery projection")
 
             updated = connection.execute(
@@ -961,9 +922,7 @@ class Drainer:
                         )
                     except DeliveryNonMutatingRejection as exc:
                         if receipt.observation is None:
-                            raise DeliveryTransientError(
-                                "typed_rejection_receipt_observation_missing"
-                            ) from exc
+                            raise DeliveryTransientError("typed_rejection_receipt_observation_missing") from exc
                         evidence = LiveTypedNonMutatingRejection.from_mapping(
                             {
                                 "schema_version": LIVE_REJECTION_SCHEMA_VERSION,
@@ -982,9 +941,7 @@ class Drainer:
                                 "receipt_observation": receipt.observation.as_mapping(),
                             }
                         )
-                        return self.store.finish_live_rejection(
-                            job, self.owner, evidence.as_mapping(), now=timestamp
-                        )
+                        return self.store.finish_live_rejection(job, self.owner, evidence.as_mapping(), now=timestamp)
                     self.checkpoint("after_post_before_acceptance_commit", job)
                     job = self.store.record_acceptance(job, self.owner, object_id, now=timestamp)
                 self.checkpoint("after_acceptance_before_get", job)
