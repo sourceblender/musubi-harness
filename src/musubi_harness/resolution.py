@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
+from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -23,7 +24,7 @@ def _as_mapping(value: object, name: str) -> Mapping[str, object]:
     return value
 
 
-def _exact_keys(value: Mapping[str, object], expected: set[str], name: str) -> None:
+def _exact_keys(value: Mapping[str, object], expected: AbstractSet[str], name: str) -> None:
     actual = set(value)
     if actual != expected:
         missing = sorted(expected - actual)
@@ -70,6 +71,23 @@ def _string_list(value: object, name: str) -> tuple[str, ...]:
     return normalized
 
 
+_STORED_OBSERVATION_KEYS = frozenset({"status", "principal", "token_scopes", "observed_at", "namespace", "operation_id", "request_digest"})
+_LOOKUP_OBSERVATION_KEYS = frozenset(
+    {
+        "status",
+        "attestation",
+        "issuer",
+        "subject",
+        "presence",
+        "effective_scopes",
+        "observed_at",
+        "namespace",
+        "operation_id",
+        "request_digest",
+    }
+)
+
+
 @dataclass(frozen=True)
 class ReceiptObservation:
     status: str
@@ -82,20 +100,28 @@ class ReceiptObservation:
 
     @classmethod
     def from_mapping(cls, raw: object) -> ReceiptObservation:
+        """Accept the stored v1 shape, or ``receipt-lookup``'s own ``receipt_observation``.
+
+        ``musubi-memory-data musubi receipt-lookup`` reports the observer as
+        ``subject``/``effective_scopes`` (with ``attestation``, ``issuer`` and
+        ``presence``), while evidence is stored as ``principal``/``token_scopes``.
+        Both Claude seats had to map these by hand to resolve a stuck row (Aoi,
+        2026-09-26). The lookup shape is normalized here; what is stored is
+        always the v1 shape, so existing evidence and the DB triggers are unchanged.
+        """
         value = _as_mapping(raw, "receipt_observation")
-        _exact_keys(
-            value,
-            {
-                "status",
-                "principal",
-                "token_scopes",
-                "observed_at",
-                "namespace",
-                "operation_id",
-                "request_digest",
-            },
-            "receipt_observation",
-        )
+        if set(value) == _LOOKUP_OBSERVATION_KEYS:
+            if value["attestation"] != "self_attested":
+                raise ContractError("receipt_observation.attestation must be self_attested")
+            if value["presence"] != value["subject"]:
+                raise ContractError("receipt_observation.presence must equal its subject")
+            _text(value["issuer"], "receipt_observation.issuer", maximum=512)
+            value = {
+                **{key: value[key] for key in _STORED_OBSERVATION_KEYS - {"principal", "token_scopes"}},
+                "principal": value["subject"],
+                "token_scopes": value["effective_scopes"],
+            }
+        _exact_keys(value, _STORED_OBSERVATION_KEYS, "receipt_observation")
         if value["status"] != "absent":
             raise ContractError("receipt_observation.status must be absent")
         return cls(
