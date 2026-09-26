@@ -5,6 +5,13 @@ All notable changes to `musubi-harness` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0](https://github.com/sourceblender/musubi-harness/compare/v1.1.1...v1.2.0) (2026-09-26)
+
+
+### Features
+
+* batch drain, so a delivery backlog can shrink ([#10](https://github.com/sourceblender/musubi-harness/issues/10)) ([6de0365](https://github.com/sourceblender/musubi-harness/commit/6de0365204a089a2f8b52ff1eeb991296950398e))
+
 ## [Unreleased]
 
 ### Added
