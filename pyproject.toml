@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "musubi-harness"
-version = "1.5.0"
+version = "1.6.0"
 description = "Host-neutral Musubi memory runtime for Claude Code, Codex, Grok, LiveKit, Hermes, and OpenClaw adapters."
 readme = "README.md"
 requires-python = ">=3.12"
