@@ -61,7 +61,7 @@ def serve(fake: Fake) -> Iterator[str]:
             self.end_headers()
             self.wfile.write(raw)
 
-        do_GET = do_POST = _handle
+        do_GET = do_POST = do_PATCH = do_DELETE = _handle
 
         def log_message(self, *args: Any) -> None:
             pass

@@ -10,6 +10,16 @@ readback contract is unchanged:
 
     status | recent | search | get | capture-durable | receipt-lookup
 
+It also carries the operator's seat-scoped correction verbs, ported from the
+operator tool with the same argv, request bodies and JSON so they can be used
+without it (1.6.0):
+
+    remember [--verify] | patch | retract | archive (alias: delete)
+
+These are owner actions on the owner's own rows, authorized by the seat's own
+token. Nothing here needs or accepts operator scope: ``delete --hard`` and
+lifecycle transitions stay with operator tooling, and are refused locally.
+
 Endpoint and credential come from the process environment the harness passes
 to its child (``MUSUBI_API_URL``, ``MUSUBI_TOKEN``). Plugins fill those from
 their own settings; users are not asked to export them.
@@ -21,6 +31,9 @@ receipt, and exits 2 on an opaque token. Musubi issues JWTs, so this is only a
 constraint on hand-made tokens.
 
 Differences from the operator tool, all deliberately stricter:
+- every write takes an explicit ``--namespace``; the operator tool's
+  identity/cwd resolution is not carried over;
+- output is always JSON, including ``remember`` without ``--json``;
 - redirects are refused, so the bearer token is never sent to another URL;
 - responses are capped at ``MAX_RESPONSE_BYTES``;
 - only ``http``/``https`` URLs without credentials, query or fragment are used.
@@ -37,6 +50,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import hashlib
 import json
 import os
 import re
@@ -53,6 +67,55 @@ RECALL_STATES = ["provisional", "matured", "promoted"]
 SETTLED_STATES = ["matured", "promoted"]
 GET_PLANES = {"episodic", "curated", "concepts", "artifacts"}
 RECEIPT_OPERATION = "capture_episodic.bucket=capture"
+RETRACT_TAGS = ("retracted", "false", "do-not-act-on")
+REMEMBER_SOURCE_TAG = "src:memory-data-remember"
+
+# Every key the server models on an episodic row. MusubiObject sets
+# extra="forbid", so a write carrying any other key makes every later GET of
+# that row return 500, and nothing exposes a payload-key delete: the row is
+# unreadable for good. Bodies here are built from known arguments; this guard
+# keeps a future edit from being one typo away from that.
+MODEL_PAYLOAD_KEYS = frozenset(
+    {
+        "access_count",
+        "content",
+        "contradicts",
+        "created_at",
+        "created_epoch",
+        "derived_from",
+        "event_at",
+        "identity_family",
+        "importance",
+        "importance_last_scored_at",
+        "ingested_at",
+        "last_accessed_at",
+        "linked_to_topics",
+        "merged_from",
+        "modality",
+        "namespace",
+        "object_id",
+        "participants",
+        "reinforcement_count",
+        "schema_version",
+        "source_context",
+        "state",
+        "summary",
+        "superseded_by",
+        "supersedes",
+        "supported_by",
+        "tags",
+        "topics",
+        "updated_at",
+        "updated_epoch",
+        "valid_from",
+        "valid_from_epoch",
+        "valid_until",
+        "valid_until_epoch",
+        "version",
+    }
+)
+# The server refuses these on PATCH (writes_episodic._FORBIDDEN_PATCH_FIELDS).
+PATCH_REFUSED_KEYS = frozenset({"state", "version", "object_id", "namespace"})
 
 
 class CliError(RuntimeError):
@@ -427,6 +490,204 @@ def cmd_receipt_lookup(args: argparse.Namespace) -> int:
     return 0
 
 
+def _write_namespace(args: argparse.Namespace) -> str:
+    if not args.namespace or not str(args.namespace).strip():
+        raise CliError("--namespace is required for writes (this client does not resolve identity)")
+    return str(args.namespace)
+
+
+def _object_path(object_id: str) -> str:
+    return f"/episodic/{urllib.parse.quote(object_id, safe='')}"
+
+
+def _read_text(args: argparse.Namespace, *, strip: bool = False) -> str:
+    """Exactly one of --content, --content-file or --stdin. A file keeps its bytes."""
+    if sum(1 for item in (bool(args.content), bool(args.content_file), bool(args.stdin)) if item) > 1:
+        raise CliError("choose only one of --content, --content-file, or --stdin")
+    if args.content_file:
+        try:
+            with open(args.content_file, "rb") as handle:
+                content = handle.read().decode("utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            raise CliError(f"cannot read content file {args.content_file}: {type(exc).__name__}") from exc
+        strip = False  # file content is exact, including leading/trailing whitespace and CRLF
+    elif args.stdin:
+        content = sys.stdin.read()
+    else:
+        content = args.content or ""
+    if strip:
+        content = content.strip()
+    if not content:
+        raise CliError("content is required")
+    return content
+
+
+def assert_writable_payload(body: dict[str, Any]) -> None:
+    """Refuse before the wire: an unmodeled key makes the row unreadable for good."""
+    unmodeled = set(body) - MODEL_PAYLOAD_KEYS
+    if unmodeled:
+        raise CliError(
+            f"refusing to write unmodeled payload key(s): {sorted(unmodeled)}; "
+            "Musubi forbids extra keys and the row would fail every later GET"
+        )
+    refused = set(body) & PATCH_REFUSED_KEYS
+    if refused:
+        raise CliError(
+            f"the server refuses these on PATCH: {sorted(refused)}; state changes are lifecycle transitions and need operator tooling"
+        )
+
+
+def cmd_remember(args: argparse.Namespace) -> int:
+    """Direct, synchronous episodic write, optionally read back by id.
+
+    ``--verify`` means one GET of the returned object id succeeded and its body
+    is included as ``readback``. It does not compare namespace or content; it
+    carries the operator tool's meaning exactly. This is not the harness's
+    queued ``remember`` (outbox, drain, receipt), which is a different contract.
+    """
+    namespace = _write_namespace(args)
+    content = _read_text(args, strip=True)
+    tags = parse_csv(args.tags) or []
+    if REMEMBER_SOURCE_TAG not in tags:
+        tags.append(REMEMBER_SOURCE_TAG)
+    body: dict[str, Any] = {"namespace": namespace, "content": content, "tags": tags, "importance": args.importance}
+    if args.summary:
+        body["summary"] = args.summary
+    if args.dry_run:
+        print_json({"dry_run": True, "method": "POST", "path": "/episodic", "body": body})
+        return 0
+    headers = {"Idempotency-Key": args.idempotency_key} if args.idempotency_key else None
+    payload = request_json("POST", "/episodic", body=body, extra_headers=headers, timeout=args.timeout)
+    object_id = str(payload.get("object_id") or "")
+    if not object_id:
+        raise CliError("Musubi capture response did not include object_id")
+    out: dict[str, Any] = {
+        "plane": "episodic",
+        "namespace": namespace,
+        "object_id": object_id,
+        "state": payload.get("state"),
+        "dedup": payload.get("dedup"),
+        "tags": tags,
+        "verified": False,
+    }
+    if args.verify:
+        out["readback"] = request_json("GET", _object_path(object_id), query={"namespace": namespace}, timeout=args.timeout)
+        out["verified"] = True
+    print_json(out)
+    return 0
+
+
+def cmd_patch(args: argparse.Namespace) -> int:
+    namespace = _write_namespace(args)
+    body: dict[str, Any] = {}
+    if args.content or args.content_file or args.stdin:
+        body["content"] = _read_text(args, strip=True)
+    if args.summary is not None:
+        body["summary"] = args.summary
+    if args.tags is not None:
+        body["tags"] = parse_csv(args.tags) or []
+    if args.importance is not None:
+        body["importance"] = args.importance
+    if not body:
+        raise CliError("nothing to patch: pass --content/--content-file/--stdin, --summary, --tags, or --importance")
+    assert_writable_payload(body)
+    if args.dry_run:
+        print_json({"PATCH": f"/episodic/{args.object_id}", "namespace": namespace, "body": body})
+        return 0
+    print_json(request_json("PATCH", _object_path(args.object_id), query={"namespace": namespace}, body=body, timeout=args.timeout))
+    return 0
+
+
+def retraction_idempotency_key(object_id: str, body: dict[str, Any]) -> str:
+    """Bind a stable retry identity to the exact intended retraction."""
+    canonical = json.dumps({"object_id": object_id, "body": body}, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode(
+        "utf-8"
+    )
+    return f"memory-data-retract-{hashlib.sha256(canonical).hexdigest()}"
+
+
+def cmd_retract(args: argparse.Namespace) -> int:
+    """Escrow a false memory and replace it with a bounded server tombstone.
+
+    Musubi owns exact-byte escrow, evidence and the non-reembedding mutation;
+    this client supplies the caller's truth and a canonical observed version,
+    fenced so a retraction never applies to a row that changed under it.
+    """
+    namespace = _write_namespace(args)
+    current = request_json("GET", _object_path(args.object_id), query={"namespace": namespace}, timeout=args.timeout)
+    expected_version = args.expected_version if args.expected_version is not None else current.get("version")
+    if isinstance(expected_version, bool) or not isinstance(expected_version, int) or expected_version < 0:
+        raise CliError("Musubi GET did not return a canonical integer version; refusing an unfenced retraction")
+    truth = _read_text(args, strip=True)
+    tags = list(RETRACT_TAGS)
+    if args.superseded_by:
+        tags.append(f"superseded-by:{args.superseded_by}")
+    for extra in parse_csv(args.tags) or []:
+        if extra not in tags:
+            tags.append(extra)
+    body = {
+        "namespace": namespace,
+        "expected_version": expected_version,
+        "on": args.on,
+        "because": args.because,
+        "truth": truth,
+        "summary": args.summary,
+        "tags": tags,
+    }
+    key = args.idempotency_key or retraction_idempotency_key(args.object_id, body)
+    if not 1 <= len(key) <= 256:
+        raise CliError("--idempotency-key must contain 1 to 256 characters")
+    path = f"{_object_path(args.object_id)}/retract"
+    if args.dry_run:
+        print_json(
+            {
+                "dry_run": True,
+                "status": "proposed_request_only",
+                "note": "No escrow or mutation was attempted.",
+                "method": "POST",
+                "path": path,
+                "headers": {"Idempotency-Key": key},
+                "body": body,
+            }
+        )
+        return 0
+    try:
+        payload = request_json("POST", path, body=body, extra_headers={"Idempotency-Key": key}, timeout=args.timeout)
+    except MusubiHTTPError:
+        raise
+    except CliError as exc:
+        # Transport failed after the request may have landed. Local values only.
+        raise CliError(
+            f"{exc}; retraction outcome may be ambiguous, do not blind-retry. Replay the exact "
+            f"server-owned operation with --expected-version {expected_version} --idempotency-key {key}"
+        ) from exc
+    print_json(payload)
+    return 0
+
+
+def cmd_archive(args: argparse.Namespace) -> int:
+    """Soft delete: state -> archived through the server's lifecycle transition."""
+    if getattr(args, "hard", False):
+        raise CliError(
+            "hard delete drops the point permanently and needs operator scope; it is not "
+            "part of the seat client. Use operator tooling, or retract to correct a false row."
+        )
+    namespace = _write_namespace(args)
+    try:
+        payload = request_json("DELETE", _object_path(args.object_id), query={"namespace": namespace}, timeout=args.timeout)
+    except MusubiHTTPError as exc:
+        error = exc.payload.get("error") if exc.payload is not None else None
+        detail = error.get("detail") if isinstance(error, dict) else None
+        if exc.status_code == 400 and isinstance(detail, str) and detail.startswith("delete transition rejected:"):
+            raise CliError(
+                f"{exc}: the lifecycle refuses archiving from this row's current state. "
+                "Other moves are operator-only lifecycle transitions; to correct a false row, use retract."
+            ) from exc
+        raise
+    print_json(payload or {"status": "deleted", "object_id": args.object_id})
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="musubi-memory-data", description=__doc__.splitlines()[0])
     parser.add_argument("--json", action="store_true", help="accepted for compatibility; output is always JSON")
@@ -472,6 +733,54 @@ def build_parser() -> argparse.ArgumentParser:
     lookup.add_argument("--request-digest", required=True)
     lookup.add_argument("--operation-id", default=RECEIPT_OPERATION, choices=[RECEIPT_OPERATION])
     lookup.set_defaults(func=cmd_receipt_lookup)
+
+    def text_source(cmd: argparse.ArgumentParser, what: str) -> None:
+        cmd.add_argument("--content", help=what)
+        cmd.add_argument("--content-file", help="read it from a UTF-8 file (exact bytes, no stripping)")
+        cmd.add_argument("--stdin", action="store_true", help="read it from stdin")
+
+    remember = sub.add_parser("remember", help="write an episodic memory directly; --verify reads it back by id")
+    remember.add_argument("--namespace", required=True)
+    text_source(remember, "memory content")
+    remember.add_argument("--summary")
+    remember.add_argument("--tags", help="comma-separated tags")
+    remember.add_argument("--importance", type=int, default=7, choices=range(1, 11))
+    remember.add_argument("--idempotency-key")
+    remember.add_argument("--verify", action="store_true", help="GET the written object by id and include it")
+    remember.add_argument("--dry-run", action="store_true", help="print the request without writing")
+    remember.set_defaults(func=cmd_remember)
+
+    patch_cmd = sub.add_parser("patch", help="edit content/summary/tags/importance on an episodic memory")
+    patch_cmd.add_argument("--namespace", required=True)
+    patch_cmd.add_argument("--object-id", required=True)
+    text_source(patch_cmd, "replacement content")
+    patch_cmd.add_argument("--summary")
+    patch_cmd.add_argument("--tags", help="comma-separated tags (replaces the existing set)")
+    patch_cmd.add_argument("--importance", type=int, choices=range(1, 11))
+    patch_cmd.add_argument("--dry-run", action="store_true")
+    patch_cmd.set_defaults(func=cmd_patch)
+
+    retract = sub.add_parser("retract", help="escrow and retract a FALSE memory through Musubi's retraction saga")
+    retract.add_argument("--namespace", required=True)
+    retract.add_argument("--object-id", required=True)
+    retract.add_argument("--on", required=True, metavar="YYYY-MM-DD", help="date of the retraction")
+    text_source(retract, "the truth that replaces the falsehood")
+    retract.add_argument("--because", required=True, help="decision and scope proving this row is false")
+    retract.add_argument("--superseded-by", help="replacement object id, if one exists")
+    retract.add_argument("--summary", help="replacement summary")
+    retract.add_argument("--tags", help="extra comma-separated tags")
+    retract.add_argument("--expected-version", type=int, help="exact version from a prior GET; only to replay an ambiguous request")
+    retract.add_argument("--idempotency-key", help="stable retry key; default derives from object id and exact body")
+    retract.add_argument("--dry-run", action="store_true", help="GET the version and print the request; no escrow or mutation")
+    retract.set_defaults(func=cmd_retract)
+
+    for name in ("archive", "delete"):
+        archive = sub.add_parser(name, help="soft delete: state -> archived" + (" (alias of archive)" if name == "delete" else ""))
+        archive.add_argument("--namespace", required=True)
+        archive.add_argument("--object-id", required=True)
+        archive.add_argument("--hard", action="store_true", help=argparse.SUPPRESS)
+        archive.add_argument("--i-have-operator-scope", action="store_true", help=argparse.SUPPRESS)
+        archive.set_defaults(func=cmd_archive)
     return parser
 
 
