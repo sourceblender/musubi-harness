@@ -276,3 +276,27 @@ def test_write_errors_never_echo_the_server_body() -> None:
     with serve(fake) as url:
         code, _, err = run(url, "patch", "--namespace", NS, "--object-id", "o1", "--summary", "s")
     assert code == 2 and TOKEN not in err and "HTTP 500 PATCH" in err
+
+
+def test_retract_5xx_after_post_is_ambiguous_and_prints_the_replay() -> None:
+    # A proxy can answer 503 after Musubi committed the retraction.
+    for status in (500, 502, 503, 504):
+        fake = Fake()
+        fake.reply("GET", "/v1/episodic/o1", 200, {"object_id": "o1", "version": 5})
+        detail = f"upstream said Bearer {TOKEN}"
+        fake.reply("POST", "/v1/episodic/o1/retract", status, {"error": {"code": "BACKEND_UNAVAILABLE", "detail": detail}})
+        with serve(fake) as url:
+            code, out, err = run(url, *retract_argv("--idempotency-key", "k-5xx"))
+        assert code == 2 and out is None, status
+        assert f"HTTP {status} POST" in err and "may be ambiguous" in err
+        assert "--expected-version 5 --idempotency-key k-5xx" in err
+        assert TOKEN not in err and "upstream said" not in err
+
+
+def test_retract_4xx_is_a_refusal_not_an_ambiguous_outcome() -> None:
+    fake = Fake()
+    fake.reply("GET", "/v1/episodic/o1", 200, {"object_id": "o1", "version": 5})
+    fake.reply("POST", "/v1/episodic/o1/retract", 409, {"error": {"code": "CONFLICT", "detail": "version_fence_violation"}})
+    with serve(fake) as url:
+        code, _, err = run(url, *retract_argv())
+    assert code == 2 and "HTTP 409 POST" in err and "(CONFLICT)" in err and "ambiguous" not in err

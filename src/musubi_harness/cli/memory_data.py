@@ -12,7 +12,7 @@ readback contract is unchanged:
 
 It also carries the operator's seat-scoped correction verbs, ported from the
 operator tool with the same argv, request bodies and JSON so they can be used
-without it (1.6.0):
+without it:
 
     remember [--verify] | patch | retract | archive (alias: delete)
 
@@ -34,6 +34,8 @@ Differences from the operator tool, all deliberately stricter:
 - every write takes an explicit ``--namespace``; the operator tool's
   identity/cwd resolution is not carried over;
 - output is always JSON, including ``remember`` without ``--json``;
+- a ``retract`` POST answered with 5xx is reported as ambiguous with the
+  local replay values, the same as a dropped connection;
 - redirects are refused, so the bearer token is never sent to another URL;
 - responses are capped at ``MAX_RESPONSE_BYTES``;
 - only ``http``/``https`` URLs without credentials, query or fragment are used.
@@ -653,8 +655,15 @@ def cmd_retract(args: argparse.Namespace) -> int:
         return 0
     try:
         payload = request_json("POST", path, body=body, extra_headers={"Idempotency-Key": key}, timeout=args.timeout)
-    except MusubiHTTPError:
-        raise
+    except MusubiHTTPError as exc:
+        # A 5xx can come from a proxy after Musubi committed, so it is as
+        # ambiguous as a dropped connection (Yua's review). 4xx is a refusal.
+        if exc.status_code < 500:
+            raise
+        raise CliError(
+            f"{exc}; retraction outcome may be ambiguous, do not blind-retry. Replay the exact "
+            f"server-owned operation with --expected-version {expected_version} --idempotency-key {key}"
+        ) from exc
     except CliError as exc:
         # Transport failed after the request may have landed. Local values only.
         raise CliError(
