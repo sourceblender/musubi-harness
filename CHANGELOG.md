@@ -5,6 +5,13 @@ All notable changes to `musubi-harness` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0](https://github.com/sourceblender/musubi-harness/compare/v1.4.0...v1.5.0) (2026-09-27)
+
+
+### Features
+
+* accept Grok adapter source ([#20](https://github.com/sourceblender/musubi-harness/issues/20)) ([90402cf](https://github.com/sourceblender/musubi-harness/commit/90402cf302cec1e9114c68a1ce65e595aac461f7))
+
 ## [Unreleased]
 
 ## [1.4.0](https://github.com/sourceblender/musubi-harness/compare/v1.3.2...v1.4.0) - 2026-09-26
