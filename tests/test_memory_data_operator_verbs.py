@@ -278,9 +278,9 @@ def test_write_errors_never_echo_the_server_body() -> None:
     assert code == 2 and TOKEN not in err and "HTTP 500 PATCH" in err
 
 
-def test_retract_5xx_after_post_is_ambiguous_and_prints_the_replay() -> None:
+def test_retract_5xx_or_408_after_post_is_ambiguous_and_prints_the_replay() -> None:
     # A proxy can answer 503 after Musubi committed the retraction.
-    for status in (500, 502, 503, 504):
+    for status in (408, 500, 502, 503, 504):
         fake = Fake()
         fake.reply("GET", "/v1/episodic/o1", 200, {"object_id": "o1", "version": 5})
         detail = f"upstream said Bearer {TOKEN}"

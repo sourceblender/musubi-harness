@@ -34,7 +34,7 @@ Differences from the operator tool, all deliberately stricter:
 - every write takes an explicit ``--namespace``; the operator tool's
   identity/cwd resolution is not carried over;
 - output is always JSON, including ``remember`` without ``--json``;
-- a ``retract`` POST answered with 5xx is reported as ambiguous with the
+- a ``retract`` POST answered with 5xx or 408 is reported as ambiguous with the
   local replay values, the same as a dropped connection;
 - redirects are refused, so the bearer token is never sent to another URL;
 - responses are capped at ``MAX_RESPONSE_BYTES``;
@@ -656,9 +656,9 @@ def cmd_retract(args: argparse.Namespace) -> int:
     try:
         payload = request_json("POST", path, body=body, extra_headers={"Idempotency-Key": key}, timeout=args.timeout)
     except MusubiHTTPError as exc:
-        # A 5xx can come from a proxy after Musubi committed, so it is as
-        # ambiguous as a dropped connection (Yua's review). 4xx is a refusal.
-        if exc.status_code < 500:
+        # A 5xx or a 408 can come from a proxy after Musubi committed, so each is
+        # as ambiguous as a dropped connection (Yua's review). Other 4xx refuse.
+        if exc.status_code < 500 and exc.status_code != 408:
             raise
         raise CliError(
             f"{exc}; retraction outcome may be ambiguous, do not blind-retry. Replay the exact "
