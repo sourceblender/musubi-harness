@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-SOURCES = frozenset({"codex", "claude-code", "openclaw", "hermes"})
+SOURCES = frozenset({"codex", "claude-code", "openclaw", "hermes", "grok"})
 CONTEXTS = frozenset({"primary", "subagent", "automation", "unknown"})
 ZONES = frozenset({"home", "work"})
 PLANES = frozenset({"episodic", "semantic", "procedural", "affective"})

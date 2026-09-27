@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "musubi-harness"
 version = "1.4.0"
-description = "Host-neutral Musubi memory runtime — the shared core that Claude Code, Codex, LiveKit, Hermes, and OpenClaw seat adapters depend on."
+description = "Host-neutral Musubi memory runtime for Claude Code, Codex, Grok, LiveKit, Hermes, and OpenClaw adapters."
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "Apache-2.0" }
@@ -36,6 +36,7 @@ Issues = "https://github.com/sourceblender/musubi-harness/issues"
 # Sibling adapters
 ClaudeCode = "https://github.com/sourceblender/musubi-claude"
 Codex = "https://github.com/sourceblender/musubi-codex"
+Grok = "https://github.com/sourceblender/musubi-grok"
 LiveKit = "https://github.com/sourceblender/musubi-livekit"
 Hermes = "https://github.com/sourceblender/musubi-hermes"
 OpenClaw = "https://github.com/sourceblender/musubi-openclaw"
