@@ -7,6 +7,7 @@ The host-neutral Musubi memory runtime — the shared core that every
 | --- | --- |
 | Claude Code | [sourceblender/musubi-claude](https://github.com/sourceblender/musubi-claude) |
 | Codex | [sourceblender/musubi-codex](https://github.com/sourceblender/musubi-codex) |
+| Grok Build | [sourceblender/musubi-grok](https://github.com/sourceblender/musubi-grok) |
 | LiveKit | [sourceblender/musubi-livekit](https://github.com/sourceblender/musubi-livekit) |
 | Hermes | [sourceblender/musubi-hermes](https://github.com/sourceblender/musubi-hermes) |
 | OpenClaw | [sourceblender/musubi-openclaw](https://github.com/sourceblender/musubi-openclaw) |
@@ -32,7 +33,7 @@ contract** every Musubi seat adapter must honor:
   never derived from the host.
 
 What it is **not**: a host binding. There is no MCP server, no Claude
-hook, no Codex hook, no OpenClaw manifest here. Those live in the
+hook, no Codex hook, no Grok plugin, no OpenClaw manifest here. Those live in the
 adapter repos. This package is the substrate they all stand on.
 
 ## What this package gives you
@@ -94,7 +95,7 @@ require a `2.0.0`.
 ## Cross-adapter invariants
 
 The harness exists so that every seat adapter — Claude Code, Codex,
-LiveKit, Hermes, OpenClaw — ships the same memory contract. To keep
+Grok Build, LiveKit, Hermes, OpenClaw — ships the same memory contract. To keep
 that promise:
 
 1. **Never import from a host adapter in this package.** The dependency
