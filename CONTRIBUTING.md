@@ -2,7 +2,7 @@
 
 Thanks for your interest in `musubi-harness`. This package is the shared
 host-neutral runtime that every seat adapter in the `musubi-*` family
-(Claude Code, Codex, LiveKit, Hermes, OpenClaw) depends on. Changes here
+(Claude Code, Codex, Grok Build, LiveKit, Hermes, OpenClaw) depends on. Changes here
 ripple out to every adapter — please keep that contract clean.
 
 ## Ground rules
