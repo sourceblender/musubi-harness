@@ -5,6 +5,13 @@ All notable changes to `musubi-harness` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0](https://github.com/sourceblender/musubi-harness/compare/v1.6.0...v1.7.0) (2026-09-28)
+
+
+### Features
+
+* add per-exchange identity and trigger envelopes ([#24](https://github.com/sourceblender/musubi-harness/issues/24)) ([db4ea0f](https://github.com/sourceblender/musubi-harness/commit/db4ea0f42ef322004f8c9ddf538cb4b7d051f850))
+
 ## [1.6.0](https://github.com/sourceblender/musubi-harness/compare/v1.5.0...v1.6.0) (2026-09-27)
 
 
