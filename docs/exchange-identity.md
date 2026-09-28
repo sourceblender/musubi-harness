@@ -49,7 +49,18 @@ Preserve whitespace and record order; normalization must not hide divergence.
 The envelope carries exact ordered input IDs when they fit its metadata limit.
 If they do not, it carries their count and the SHA-256 of a canonical JSON
 array of those IDs (UTF-8, no added whitespace); the full list remains
-rederivable from the transcript. Both adapters use the same overflow rule.
+rederivable from the transcript. It also carries the SHA-256 of a canonical
+JSON array of each input record's exact text, so different per-record texts
+cannot collide merely because their joined display text matches. Both
+adapters use the same overflow and text-digest rules.
+
+Test vector: for input IDs `["msg-u1","msg-u2"]`, the ID digest is
+`771d33cf781a6d602e0f9a1aa015f1f8091adf517ad1acf7faad995fe304b2e9`.
+For exact texts `["a\n\nb","é — tide"]`, the text digest is
+`76c47782eab50b4bde0213914d1773556a210858b7c25d8f798c9dcb579bfd5f`.
+The preimage is the UTF-8 encoding of the bare JSON array, with non-ASCII
+characters unescaped and no spaces after separators (`ensure_ascii=False`,
+`separators=(",", ":")` in Python).
 An already stored event with the same ID and same canonical content is an
 idempotent replay. The same ID with a different span, trigger, or answer is
 an identity collision and must fail closed with a diagnostic; it must never
@@ -119,6 +130,8 @@ trigger fields. The trigger fields are optional with defaults so existing
 envelopes remain valid, and absent from serialized voice envelopes so exact
 legacy replay remains idempotent. Trigger classes are closed vocabulary:
 `task-notification`, `peer-message`, `scheduled`, and `slash-command`.
+The harness and both adapters must update this vocabulary together; an
+adapter must not emit a trigger class the harness cannot validate.
 Secret screening and size limits apply to `trigger_text`; refused envelopes
 redact it before storage.
 
