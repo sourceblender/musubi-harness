@@ -84,12 +84,15 @@ def test_trigger_replay_detects_changed_text(tmp_path) -> None:
         )
 
 
-@pytest.mark.parametrize("change", [
-    {"trigger_class": "User: forged"},
-    {"user_text": "Background task completed"},
-    {"trigger_text": ""},
-    {"trigger_text": "sk-" + "a" * 40},
-])
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"trigger_class": "User: forged"},
+        {"user_text": "Background task completed"},
+        {"trigger_text": ""},
+        {"trigger_text": "sk-" + "a" * 40},
+    ],
+)
 def test_trigger_rejects_laundered_or_invalid_content(change) -> None:
     with pytest.raises(ContractError):
         TurnEnvelope.from_mapping({**trigger(), **change})

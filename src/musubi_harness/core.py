@@ -115,9 +115,7 @@ class TurnEnvelope:
             raise ContractError("zone is invalid")
         if self.input_kind == "voice":
             user_text = _required_text(self.user_text, "user_text", 65536)
-            if any(value is not None for value in (
-                self.trigger_class, self.trigger_record_id, self.trigger_text
-            )):
+            if any(value is not None for value in (self.trigger_class, self.trigger_record_id, self.trigger_text)):
                 raise ContractError("voice envelope must not carry trigger fields")
         elif self.input_kind == "trigger":
             if self.user_text != "":
@@ -126,8 +124,7 @@ class TurnEnvelope:
                 raise ContractError("trigger_class is invalid")
             if not isinstance(self.trigger_record_id, str) or not EVENT_RE.fullmatch(self.trigger_record_id):
                 raise ContractError("trigger_record_id is invalid")
-            _required_text(self.trigger_text, "trigger_text", 65536)
-            user_text = self.trigger_text
+            user_text = _required_text(self.trigger_text, "trigger_text", 65536)
         else:
             raise ContractError("input_kind is invalid")
         assistant_text = _required_text(self.assistant_text, "assistant_text", 65536)
@@ -237,9 +234,7 @@ class Outbox:
         envelope_dict = envelope.as_dict()
         if decision.disposition == "refuse":
             sensitive_fields = {"user_text", "assistant_text", "trigger_text", "metadata"}
-            envelope_dict = {
-                key: value for key, value in envelope_dict.items() if key not in sensitive_fields
-            }
+            envelope_dict = {key: value for key, value in envelope_dict.items() if key not in sensitive_fields}
             envelope_dict["content_redacted"] = True
         payload = json.dumps(
             envelope_dict,

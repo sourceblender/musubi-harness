@@ -391,10 +391,7 @@ class DeliveryStore:
             envelope = TurnEnvelope.from_mapping(json.loads(captured["envelope_json"]))
             if content is None:
                 if envelope.input_kind == "trigger":
-                    content = (
-                        f"Trigger ({envelope.trigger_class}): {envelope.trigger_text}"
-                        f"\n\nAssistant: {envelope.assistant_text}"
-                    )
+                    content = f"Trigger ({envelope.trigger_class}): {envelope.trigger_text}\n\nAssistant: {envelope.assistant_text}"
                 else:
                     content = f"User: {envelope.user_text}\n\nAssistant: {envelope.assistant_text}"
             if tags is None:
