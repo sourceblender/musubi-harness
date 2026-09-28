@@ -58,6 +58,10 @@ array fits, otherwise `input_record_ids_sha256` and `input_record_count`, and
 always `input_record_texts_sha256`. These names and the digest preimages are
 shared across host adapters. Adapters may add host-local provenance fields
 that are stable on replay.
+The `input_record_ids` metadata value is the canonical JSON array encoded as
+a **string** (UTF-8, `ensure_ascii=False`, separators `(",", ":")`), because
+envelope metadata accepts scalar values. The overflow limit applies to that
+serialized string's UTF-8 byte length.
 
 Test vector: for input IDs `["msg-u1","msg-u2"]`, the ID digest is
 `771d33cf781a6d602e0f9a1aa015f1f8091adf517ad1acf7faad995fe304b2e9`.
