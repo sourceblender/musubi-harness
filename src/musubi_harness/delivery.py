@@ -390,7 +390,10 @@ class DeliveryStore:
                 raise ContractError("only an existing shadow capture can be staged")
             envelope = TurnEnvelope.from_mapping(json.loads(captured["envelope_json"]))
             if content is None:
-                content = f"User: {envelope.user_text}\n\nAssistant: {envelope.assistant_text}"
+                if envelope.input_kind == "trigger":
+                    content = f"Trigger ({envelope.trigger_class}): {envelope.trigger_text}\n\nAssistant: {envelope.assistant_text}"
+                else:
+                    content = f"User: {envelope.user_text}\n\nAssistant: {envelope.assistant_text}"
             if tags is None:
                 tags = (f"src:{envelope.source}-auto",)
             if not isinstance(content, str) or not content.strip() or len(content.encode("utf-8")) > 131072:
