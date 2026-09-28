@@ -53,6 +53,11 @@ rederivable from the transcript. It also carries the SHA-256 of a canonical
 JSON array of each input record's exact text, so different per-record texts
 cannot collide merely because their joined display text matches. Both
 adapters use the same overflow and text-digest rules.
+The metadata keys are `answer_id`, `input_record_ids` when the ordered ID
+array fits, otherwise `input_record_ids_sha256` and `input_record_count`, and
+always `input_record_texts_sha256`. These names and the digest preimages are
+shared across host adapters. Adapters may add host-local provenance fields
+that are stable on replay.
 
 Test vector: for input IDs `["msg-u1","msg-u2"]`, the ID digest is
 `771d33cf781a6d602e0f9a1aa015f1f8091adf517ad1acf7faad995fe304b2e9`.
@@ -66,6 +71,9 @@ idempotent replay. The same ID with a different span, trigger, or answer is
 an identity collision and must fail closed with a diagnostic; it must never
 silently overwrite the stored event. Replaying a previous final must not
 prevent a later final under the same turn ID from being captured.
+An ambiguous or ineligible span declines at that terminal answer and closes
+there. It must not block a later valid answer in the same host turn or poison
+the rest of a transcript. Record each decline by its own named reason.
 
 The adapter must resolve the anchor and span from the transcript when the
 native Stop payload omits the final message ID. A staged prompt or the Stop
