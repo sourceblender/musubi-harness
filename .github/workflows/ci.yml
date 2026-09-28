@@ -8,6 +8,11 @@ on:
   # Called by release-please.yml so nothing publishes from a red commit.
   workflow_call:
 
+# Superseded PR runs are cancelled; every merged main commit keeps its own run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 
