@@ -17,6 +17,7 @@ SOURCES = frozenset({"codex", "claude-code", "openclaw", "hermes", "grok"})
 CONTEXTS = frozenset({"primary", "subagent", "automation", "unknown"})
 ZONES = frozenset({"home", "work"})
 PLANES = frozenset({"episodic", "semantic", "procedural", "affective"})
+TRIGGER_CLASSES = frozenset({"task-notification", "peer-message", "scheduled", "slash-command"})
 IDENTITY_RE = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
 PRESENCE_RE = re.compile(r"^[a-z][a-z0-9_-]{0,31}/[a-z0-9][a-z0-9_-]{0,31}$")
 EVENT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,191}$")
@@ -76,14 +77,19 @@ class TurnEnvelope:
     assistant_text: str
     captured_at: str
     metadata: Mapping[str, str | int | float | bool | None] = field(default_factory=dict)
+    input_kind: str = "voice"
+    trigger_class: str | None = None
+    trigger_record_id: str | None = None
+    trigger_text: str | None = None
 
     @classmethod
     def from_mapping(cls, raw: Mapping[str, Any]) -> TurnEnvelope:
         if not isinstance(raw, Mapping):
             raise ContractError("envelope must be an object")
         expected = set(cls.__dataclass_fields__)
+        optional = {"input_kind", "trigger_class", "trigger_record_id", "trigger_text"}
         unknown = set(raw) - expected
-        missing = expected - set(raw)
+        missing = expected - optional - set(raw)
         if unknown or missing:
             raise ContractError(f"envelope fields mismatch: missing={sorted(missing)} unknown={sorted(unknown)}")
         envelope = cls(**raw)
@@ -107,7 +113,23 @@ class TurnEnvelope:
             raise ContractError("source is invalid")
         if self.zone not in ZONES:
             raise ContractError("zone is invalid")
-        user_text = _required_text(self.user_text, "user_text", 65536)
+        if self.input_kind == "voice":
+            user_text = _required_text(self.user_text, "user_text", 65536)
+            if any(value is not None for value in (
+                self.trigger_class, self.trigger_record_id, self.trigger_text
+            )):
+                raise ContractError("voice envelope must not carry trigger fields")
+        elif self.input_kind == "trigger":
+            if self.user_text != "":
+                raise ContractError("trigger envelope user_text must be empty")
+            if self.trigger_class not in TRIGGER_CLASSES:
+                raise ContractError("trigger_class is invalid")
+            if not isinstance(self.trigger_record_id, str) or not EVENT_RE.fullmatch(self.trigger_record_id):
+                raise ContractError("trigger_record_id is invalid")
+            _required_text(self.trigger_text, "trigger_text", 65536)
+            user_text = self.trigger_text
+        else:
+            raise ContractError("input_kind is invalid")
         assistant_text = _required_text(self.assistant_text, "assistant_text", 65536)
         if SECRET_RE.search(user_text) or SECRET_RE.search(assistant_text):
             raise ContractError("capture contains secret-like material")
@@ -129,7 +151,12 @@ class TurnEnvelope:
 
     def as_dict(self) -> dict[str, Any]:
         self.validate()
-        return asdict(self)
+        result = asdict(self)
+        if self.input_kind == "voice":
+            # Preserve the exact mapping of pre-1.7 captures for replay.
+            for key in ("input_kind", "trigger_class", "trigger_record_id", "trigger_text"):
+                result.pop(key)
+        return result
 
 
 @dataclass(frozen=True)
@@ -209,7 +236,10 @@ class Outbox:
         decision = policy.evaluate(envelope)
         envelope_dict = envelope.as_dict()
         if decision.disposition == "refuse":
-            envelope_dict = {key: value for key, value in envelope_dict.items() if key not in {"user_text", "assistant_text", "metadata"}}
+            sensitive_fields = {"user_text", "assistant_text", "trigger_text", "metadata"}
+            envelope_dict = {
+                key: value for key, value in envelope_dict.items() if key not in sensitive_fields
+            }
             envelope_dict["content_redacted"] = True
         payload = json.dumps(
             envelope_dict,

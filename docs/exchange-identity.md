@@ -32,7 +32,7 @@ decline, not a cross-context fold.
 
 Each terminal-answer occurrence yields at most one capture event. Its identity
 is a tuple of version, host, session, and the terminal answer's host message
-ID (for example, `exchange/v1:<host>:<session>:<answer_id>`). An implementation
+ID (for example, `exchange.v1:<host>:<session>:<answer_id>`). An implementation
 may encode that tuple as a string, but it must preserve the namespace and exact
 IDs. Turn IDs, prompt IDs, timestamps, input text,
 answer text, and content hashes are not exchange identities. In particular,
@@ -46,6 +46,10 @@ input record host IDs, the exact input text for each record, the answer record
 host ID, the exact answer text, and any trigger class, host record ID, and exact
 trigger text.
 Preserve whitespace and record order; normalization must not hide divergence.
+The envelope carries exact ordered input IDs when they fit its metadata limit.
+If they do not, it carries their count and the SHA-256 of a canonical JSON
+array of those IDs (UTF-8, no added whitespace); the full list remains
+rederivable from the transcript. Both adapters use the same overflow rule.
 An already stored event with the same ID and same canonical content is an
 idempotent replay. The same ID with a different span, trigger, or answer is
 an identity collision and must fail closed with a diagnostic; it must never
@@ -105,6 +109,18 @@ laundered into tty-voiced input. If there are several plausible triggers,
 the adapter must preserve their ordered provenance or decline as ambiguous.
 An answer with neither eligible input nor a classified trigger declines as
 `no_eligible_input`; no input is invented.
+
+The harness envelope represents these as `input_kind=voice` (the default for
+older adapters) or `input_kind=trigger`. A trigger envelope has empty
+`user_text` and separate `trigger_class`, `trigger_record_id`, and
+`trigger_text` fields. Delivery renders it as `Trigger (<class>): <text>`,
+never as `User: <text>`. A voice envelope has nonempty `user_text` and no
+trigger fields. The trigger fields are optional with defaults so existing
+envelopes remain valid, and absent from serialized voice envelopes so exact
+legacy replay remains idempotent. Trigger classes are closed vocabulary:
+`task-notification`, `peer-message`, `scheduled`, and `slash-command`.
+Secret screening and size limits apply to `trigger_text`; refused envelopes
+redact it before storage.
 
 ## Conformance cases
 
