@@ -10,7 +10,7 @@ def test_opencode_source_is_valid_for_capture_and_explicit_remember(tmp_path):
         {
             "event_id": "opencode:session:turn",
             "actor": "iris",
-            "presence": "iris/command-chair",
+            "presence": "iris/agent",
             "plane": "episodic",
             "context": "primary",
             "source": "opencode",
@@ -30,7 +30,7 @@ def test_opencode_source_is_valid_for_capture_and_explicit_remember(tmp_path):
         server_name="musubi-opencode",
     )
     command, content, event_id = facade.remember_command(
-        RuntimeConfig(actor="iris", presence="iris/command-chair", zone="home"),
+        RuntimeConfig(actor="iris", presence="iris/agent", zone="home"),
         {"content": "A durable decision", "idempotency_key": "opencode-source-test"},
     )
     assert command[command.index("--source") + 1] == "opencode"
