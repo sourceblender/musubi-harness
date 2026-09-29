@@ -65,7 +65,7 @@ jobs:
       # Tracks Musubi main, so server drift fails here.
       - name: Musubi source for parity tests
         # Outside the workspace: the secret-pattern test scans this repo's text.
-        run: git clone --depth 1 --quiet https://github.com/ericmey/musubi "$RUNNER_TEMP/musubi-src"
+        run: git clone --depth 1 --quiet https://github.com/sourceblender/musubi "$RUNNER_TEMP/musubi-src"
 
       - name: pytest
         env:
