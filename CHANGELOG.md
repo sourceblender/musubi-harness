@@ -5,6 +5,13 @@ All notable changes to `musubi-harness` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0](https://github.com/sourceblender/musubi-harness/compare/v1.7.0...v1.8.0) (2026-09-29)
+
+
+### Features
+
+* accept OpenCode as a memory source ([#27](https://github.com/sourceblender/musubi-harness/issues/27)) ([e85ffb8](https://github.com/sourceblender/musubi-harness/commit/e85ffb811b81c6bc4c3b004e1ed7852a718658cc))
+
 ## [1.7.0](https://github.com/sourceblender/musubi-harness/compare/v1.6.0...v1.7.0) (2026-09-28)
 
 
