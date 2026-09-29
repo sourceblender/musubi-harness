@@ -8,6 +8,7 @@ The host-neutral Musubi memory runtime — the shared core that every
 | Claude Code | [sourceblender/musubi-claude](https://github.com/sourceblender/musubi-claude) |
 | Codex | [sourceblender/musubi-codex](https://github.com/sourceblender/musubi-codex) |
 | Grok Build | [sourceblender/musubi-grok](https://github.com/sourceblender/musubi-grok) |
+| OpenCode | [sourceblender/musubi-opencode](https://github.com/sourceblender/musubi-opencode) |
 | LiveKit | [sourceblender/musubi-livekit](https://github.com/sourceblender/musubi-livekit) |
 | Hermes | [sourceblender/musubi-hermes](https://github.com/sourceblender/musubi-hermes) |
 | OpenClaw | [sourceblender/musubi-openclaw](https://github.com/sourceblender/musubi-openclaw) |

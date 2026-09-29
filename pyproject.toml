@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "musubi-harness"
 version = "1.7.0"
-description = "Host-neutral Musubi memory runtime for Claude Code, Codex, Grok, LiveKit, Hermes, and OpenClaw adapters."
+description = "Host-neutral Musubi memory runtime for Claude Code, Codex, Grok, OpenCode, LiveKit, Hermes, and OpenClaw adapters."
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "Apache-2.0" }
@@ -40,6 +40,7 @@ Grok = "https://github.com/sourceblender/musubi-grok"
 LiveKit = "https://github.com/sourceblender/musubi-livekit"
 Hermes = "https://github.com/sourceblender/musubi-hermes"
 OpenClaw = "https://github.com/sourceblender/musubi-openclaw"
+OpenCode = "https://github.com/sourceblender/musubi-opencode"
 
 [project.scripts]
 musubi-harness = "musubi_harness.cli.harness:main"
