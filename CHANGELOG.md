@@ -5,6 +5,13 @@ All notable changes to `musubi-harness` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.1](https://github.com/sourceblender/musubi-harness/compare/v1.8.0...v1.8.1) (2026-09-29)
+
+
+### Documentation
+
+* point Musubi links at sourceblender/musubi ([#29](https://github.com/sourceblender/musubi-harness/issues/29)) ([9647937](https://github.com/sourceblender/musubi-harness/commit/964793729cbc0a1af8030f7ae74d46d73d93cb77))
+
 ## [1.8.0](https://github.com/sourceblender/musubi-harness/compare/v1.7.0...v1.8.0) (2026-09-29)
 
 
